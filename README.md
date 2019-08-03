@@ -27,7 +27,7 @@ If you want quickly make use of BArT in your own Jupyter Notebook, this section 
       1. supply a relative path to the driver (including driver name) in `config.ini` > `[selenium_config]` > `WEBDRIVER_PATH`.<br><br>
 
 1. **Fulfill dependencies**. Ensure you've installed and upgraded the following Python libraries:
-    - `BeautifulSoup`
+    - `BeautifulSoup4`
     - `collections`
     - `configparser`
     - `datetime`
