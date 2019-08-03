@@ -6,13 +6,13 @@
 
 The Broadcastify Archive Tool (BArT) automates downloading audio archives from [Broadcastify](www.broadcastify.com), "the world's largest source of Public Safety, Airline, Rail, and Marine live audio streams".
 
-BArT was initially developed as part of a group project during a [General Assembly Data Science Immersive program](https://generalassemb.ly/education/data-science-immersive/), in response to a client's need to visualize where first responders were being dispatched to during emergencies. We sought out a large repository of emergency radio dispatches to train our audio-to-text-to-geolocation algorithm.
+BArT was initially developed as part of a group project during the summer 2019 [General Assembly Data Science Immersive program](https://generalassemb.ly/education/data-science-immersive/), in response to a client's need to visualize where first responders were being dispatched to during emergencies. We sought out a large repository of emergency radio dispatches to train our audio-to-text-to-geolocation algorithm. Although Broadcastify's archive was the clear winner in terms of breadth and depth for this data, the lack of an API for downloading audio files meant that the process for acquiring the archive files was highly manual and time-consuming.
 
-Although Broadcastify's archive was the clear winner in terms of breadth and depth for this data, the lack of an API for downloading audio files meant that the process for acquiring the archive files was highly manual and time-consuming. BArT solves that problem.
+BArT solves that problem.
 
 ## Quick-start Guide
 
-If you want quickly make use of BArT in your own Jupyter Notebook, this section is for you!
+If you want quickly make use of BArT in your own Python project, this section is for you!
 
 1. **Get a Broadcastify Premium account.** Access to the archives is behind a paywall. For $15, you can get 180 days of preimium access.
     - More information at https://m.broadcastify.com/premium/<br><br>
@@ -28,7 +28,7 @@ If you want quickly make use of BArT in your own Jupyter Notebook, this section 
     - `pwd.ini`
         - Use the `sample_pwd.ini` in this repo as a template
         - Add your Broadcastify premium username & password in the appropriate spots
-        - Assuming you're using GitHub, save the file to a directory that's listed in your `.gitignore` file (this is important so that your login information doesnt' become part of your commit history.<br><br>
+        - Assuming you're using GitHub, save the file to a directory that's listed in your `.gitignore` file (this is important so that your login information doesn't become part of your commit history.<br><br>
 
 1. **Install selenium**. Selenium is a browser emulator used to interact with Broadcastify's archive navigation tools.
     - Install with `pip install -U selenium`<br><br>
@@ -52,7 +52,7 @@ If you want quickly make use of BArT in your own Jupyter Notebook, this section 
 
 ## <span style="color:red">**DOCUMENTATION UNDER DEVELOPMENT**</span>
 
-**_This project is just getting under way. A minimal level of documentation is included in the `.py` file. Stay tuned for user documentation._**
+**_This project is just getting under way. Some documentation is included in the docstrings of the `.py` file. Stay tuned for more complete user documentation._**
 
 ## Longer, but More Thorough, Guide
 
