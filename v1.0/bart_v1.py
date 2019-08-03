@@ -38,6 +38,7 @@ import os
 import re
 import requests
 
+from configparser import ConfigParser, ExtendedInterpolation
 from datetime import date, datetime, timedelta
 from IPython.display import clear_output
 from time import time as timer
@@ -52,25 +53,35 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 
-
 #-----------------------------------------------------------------------------
-# Constants
+# Constants & Configs
 #-----------------------------------------------------------------------------
-_FEED_URL_STEM = 'https://www.broadcastify.com/listen/feed/'
-_ARCHIVE_FEED_STEM = 'https://m.broadcastify.com/archives/feed/'
-_ARCHIVE_DOWNLOAD_STEM = 'https://m.broadcastify.com/archives/id/'
-_LOGIN_URL = 'https://www.broadcastify.com/login/'
-_FIRST_URI_IN_ATT_XPATH = "//a[contains(@href,'/archives/download/')]"
-
-_FILE_REQUEST_WAIT = 5 # seconds
-_PAGE_REQUEST_WAIT = 2 # seconds
-_WEBDRIVER_PATH = '../assets/chromedriver' # to use Chrome in Selenium
-_MP3_OUT_PATH = '../audio_data/audio_files/mp3_files/'
-
 _MONTHS = ['','January', 'February', 'March',
       'April', 'May', 'June',
       'July', 'August', 'September',
       'October', 'November', 'December']
+
+_config = ConfigParser(interpolation=ExtendedInterpolation())
+_config.read("config.ini")
+
+# Base URLs
+_FEED_URL_STEM =_config['base_urls']['FEED_URL_STEM']
+_ARCHIVE_FEED_STEM =_config['base_urls']['ARCHIVE_FEED_STEM']
+_ARCHIVE_DOWNLOAD_STEM =_config['base_urls']['ARCHIVE_DOWNLOAD_STEM']
+_LOGIN_URL =_config['base_urls']['LOGIN_URL']
+
+# Throttle times
+_FILE_REQUEST_WAIT =_config['throttle_times']['FILE_REQUEST_WAIT']
+_PAGE_REQUEST_WAIT =_config['throttle_times']['PAGE_REQUEST_WAIT']
+
+# Selenium config
+_WEBDRIVER_PATH =_config['selenium_config']['WEBDRIVER_PATH']
+if _WEBDRIVER_PATH == '':
+    _WEBDRIVER_PATH = None
+
+# Output path
+_MP3_OUT_PATH =_config['output_path']['MP3_OUT_PATH']
+
 
 #-----------------------------------------------------------------------------
 # Variables
@@ -79,6 +90,8 @@ ArchiveEntry = collections.namedtuple(
                                 'ArchiveEntry',
                                 'feed_id file_uri file_end_datetime mp3_url'
                                 )
+
+_first_uri_in_att_xpath = "//a[contains(@href,'/archives/download/')]"
 
 
 class NavigatorException(Exception):
@@ -501,7 +514,7 @@ class _ArchiveNavigator:
 
         # Wait for page to render
         element = WebDriverWait(self.browser, 10).until_not(
-                    EC.text_to_be_present_in_element((By.XPATH, _FIRST_URI_IN_ATT_XPATH),
+                    EC.text_to_be_present_in_element((By.XPATH, _first_uri_in_att_xpath),
                                                       self.current_first_uri))
 
         self.current_first_uri = self.__get_current_first_uri()
@@ -588,7 +601,7 @@ class _ArchiveNavigator:
 
     def __get_current_first_uri(self):
         return self.browser.find_element_by_xpath(
-                    _FIRST_URI_IN_ATT_XPATH
+                    _first_uri_in_att_xpath
                     ).get_attribute('href').split('/')[-1]
 
     def open_browser(self):
@@ -598,7 +611,7 @@ class _ArchiveNavigator:
         options = Options()
         options.headless = True
         # Launch Chrome
-        self.browser = webdriver.Chrome(_WEBDRIVER_PATH, chrome_options=options)
+        self.browser = webdriver.Chrome(chrome_options=options)
 
     def close_browser(self):
         if self.verbose: print('Closing browser...')
