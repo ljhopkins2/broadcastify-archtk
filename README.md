@@ -15,15 +15,16 @@ Although Broadcastify's archive was the clear winner in terms of breadth and dep
 If you want quickly make use of BArT in your own Jupyter Notebook, this section is for you!
 
 1. **Get a Broadcastify Premium account.** Access to the archives is behind a paywall. For $15, you can get 180 days of preimium access.
-    - More information at https://m.broadcastify.com/premium/
+    - More information at https://m.broadcastify.com/premium/<br><br>
 
 1. **Copy library file.** BArT source code.
     - Put `bart.py` into the directory with your `.ipynb` file<br><br>
 
-1. **Copy library and config files.** You'll need to edit `config.ini` and `pwd.ini`.
+1. **Copy and modify config files.** The system needs two config files to run:
     - `config.ini`
         - Ensure it's in the same directory as the `.py` & `.ipynb` files
-        - Edit the AUTH_DATA_PATH value to point to your `pwd.ini`
+        - Edit the `MP3_OUT_PATH` value to point to where you want to store `mp3` files
+        - Edit the `AUTH_DATA_PATH` value to point to your `pwd.ini`
     - `pwd.ini`
         - Use the `sample_pwd.ini` in this repo as a template
         - Add your Broadcastify premium username & password in the appropriate spots
