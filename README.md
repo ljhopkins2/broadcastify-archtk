@@ -2,10 +2,6 @@
 
 **Version 0.1**
 
-## <span style="color:red">**DOCUMENTATION UNDER DEVELOPMENT**</span>
-
-**_This project is just getting under way. A minimal level of documentation is included in the `.py` file. Stay tuned for user documentation._**
-
 ## Preface
 
 The Broadcastify Archive Tool (BArT) automates downloading audio archives from [Broadcastify](www.broadcastify.com), "the world's largest source of Public Safety, Airline, Rail, and Marine live audio streams".
@@ -40,6 +36,10 @@ If you want quickly make use of BArT in your own Jupyter Notebook, this section 
     - `re`
     - `requests`
     - `time`
+
+## <span style="color:red">**DOCUMENTATION UNDER DEVELOPMENT**</span>
+
+**_This project is just getting under way. A minimal level of documentation is included in the `.py` file. Stay tuned for user documentation._**
 
 ## Longer, but More Thorough, Guide
 
