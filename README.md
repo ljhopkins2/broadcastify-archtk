@@ -1,6 +1,7 @@
 # Broadcastify ARchive Toolkit (BArT)<br>Documentation
 
-**Version 0.1**
+**Version 0.1**<br>
+<img src="https://github.com/ljhopkins2/BArT/blob/master/assets/img/bart.png" width="400">
 
 ## Preface
 
