@@ -2,7 +2,7 @@
 
 **Version 0.1**<br>
 <img src="https://github.com/ljhopkins2/BArT/blob/master/assets/img/bart.png" width="400">
-
+<sub><sup>Artwork source: https://www.asciiart.eu/cartoons/simpsons</sub></sup>
 ## Preface
 
 The Broadcastify Archive Tool (BArT) automates downloading audio archives from [Broadcastify](www.broadcastify.com), "the world's largest source of Public Safety, Airline, Rail, and Marine live audio streams".
@@ -63,4 +63,3 @@ If you want quickly make use of BArT in your own Python project, this section is
 ### Use Case Walk-throughs
 
 ## FAQ
-
