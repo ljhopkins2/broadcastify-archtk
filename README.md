@@ -15,7 +15,8 @@ BArT solves that problem.
 If you want quickly make use of BArT in your own Python project, this section is for you!
 
 1. **Get a Broadcastify Premium account.** Access to the archives is behind a paywall. For $15, you can get 180 days of preimium access.
-    - More information at https://m.broadcastify.com/premium/<br><br>
+    - More information at https://m.broadcastify.com/premium/
+    - Once you have your login info, go ahead and try the [BArT demo](https://github.com/ljhopkins2/BArT/blob/master/bart_demo.ipynb)<br><br>
 
 1. **Copy library file.** BArT source code.
     - Put `bart.py` into the directory with your `.ipynb` file<br><br>
