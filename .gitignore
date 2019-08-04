@@ -1,5 +1,8 @@
-# Private folders
+# Project-specific folders
+# private .ini files
 private
+# mp3 files and folders
+*mp3*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
