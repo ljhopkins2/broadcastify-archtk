@@ -1,8 +1,19 @@
 # Broadcastify ARchive Toolkit (BArT)<br>Documentation
 
 **Version 0.1**<br>
-<img src="https://github.com/ljhopkins2/BArT/blob/master/assets/img/bart.png" width="400">
+```
+   |\/\/\/|  +------------------------+
+   |      |  | Eat my shortwave, man. |
+   |      |  +------------------------+
+   | (o)(o)    /
+   C      _)  /
+    | ,___|
+    |   /
+   /____\
+  /      \
+```
 <sub><sup>Artwork source: https://www.asciiart.eu/cartoons/simpsons</sub></sup>
+
 ## Preface
 
 The Broadcastify Archive Tool (BArT) automates downloading audio archives from [Broadcastify](www.broadcastify.com), "the world's largest source of Public Safety, Airline, Rail, and Marine live audio streams".
