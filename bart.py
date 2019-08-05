@@ -34,10 +34,13 @@
 # Imports
 #-----------------------------------------------------------------------------
 import collections
+import errno
 import os
 import re
 import requests
+import pdb
 
+from configparser import ConfigParser, ExtendedInterpolation
 from datetime import date, datetime, timedelta
 from IPython.display import clear_output
 from time import time as timer
@@ -52,25 +55,51 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 
-
 #-----------------------------------------------------------------------------
-# Constants
+# Constants & Configs
 #-----------------------------------------------------------------------------
-_FEED_URL_STEM = 'https://www.broadcastify.com/listen/feed/'
-_ARCHIVE_FEED_STEM = 'https://m.broadcastify.com/archives/feed/'
-_ARCHIVE_DOWNLOAD_STEM = 'https://m.broadcastify.com/archives/id/'
-_LOGIN_URL = 'https://www.broadcastify.com/login/'
-_FIRST_URI_IN_ATT_XPATH = "//a[contains(@href,'/archives/download/')]"
-
-_FILE_REQUEST_WAIT = 5 # seconds
-_PAGE_REQUEST_WAIT = 2 # seconds
-_WEBDRIVER_PATH = '../assets/chromedriver' # to use Chrome in Selenium
-_MP3_OUT_PATH = '../audio_data/audio_files/mp3_files/'
-
+_CONFIG_FILENAME = 'config.ini'
 _MONTHS = ['','January', 'February', 'March',
       'April', 'May', 'June',
       'July', 'August', 'September',
       'October', 'November', 'December']
+
+_config = ConfigParser(interpolation=ExtendedInterpolation())
+config_result = _config.read(_CONFIG_FILENAME)
+
+if len(config_result) == 0:
+    raise FileNotFoundError(errno.ENOENT,
+                            os.strerror(errno.ENOENT),
+                            _CONFIG_FILENAME)
+
+# Base URLs
+_FEED_URL_STEM = _config['base_urls']['FEED_URL_STEM']
+_ARCHIVE_FEED_STEM = _config['base_urls']['ARCHIVE_FEED_STEM']
+_ARCHIVE_DOWNLOAD_STEM = _config['base_urls']['ARCHIVE_DOWNLOAD_STEM']
+_LOGIN_URL = _config['base_urls']['LOGIN_URL']
+
+# Throttle times
+_FILE_REQUEST_WAIT = _config.getfloat('throttle_times',
+                                      'FILE_REQUEST_WAIT',
+                                      fallback=5)
+_PAGE_REQUEST_WAIT = _config.getfloat('throttle_times',
+                                      'PAGE_REQUEST_WAIT',
+                                      fallback=2)
+
+# Selenium config
+_WEBDRIVER_PATH = _config.get('selenium_config',
+                              'WEBDRIVER_PATH',
+                              fallback=None)
+
+if _WEBDRIVER_PATH == '':
+    _WEBDRIVER_PATH = None
+
+# Output path
+_MP3_OUT_PATH = _config['output_path']['MP3_OUT_PATH']
+
+# Authentication data
+_AUTH_DATA_PATH = _config['authentication_path']['AUTH_DATA_PATH']
+
 
 #-----------------------------------------------------------------------------
 # Variables
@@ -80,7 +109,22 @@ ArchiveEntry = collections.namedtuple(
                                 'feed_id file_uri file_end_datetime mp3_url'
                                 )
 
+_first_uri_in_att_xpath = "//a[contains(@href,'/archives/download/')]"
 
+
+#-----------------------------------------------------------------------------
+# Functions
+#-----------------------------------------------------------------------------
+def login_credentials_present(username, password):
+    if not username or not password:
+        raise NavigatorException(
+                "No login credentials supplied.")
+    else:
+        return True
+
+#-----------------------------------------------------------------------------
+# Classes
+#-----------------------------------------------------------------------------
 class NavigatorException(Exception):
     pass
 
@@ -174,6 +218,28 @@ class BroadcastifyArchive:
         self._an = None
         self._verbose = verbose
 
+        # If username or password was not passed...
+        if not username or not password:
+            # ...try to get it from the pwd.ini file
+            config_result = _config.read(_AUTH_DATA_PATH)
+
+            if len(config_result) == 0:
+                raise FileNotFoundError(errno.ENOENT,
+                                        os.strerror(errno.ENOENT),
+                                        _AUTH_DATA_PATH)
+
+            self.username = _config['authentication_data']['username']
+            self.password = _config['authentication_data']['password']
+
+        # If still no username/password, set it to null and work it out
+        # later during build().
+        if self.username == '':
+            self.username = None
+
+        if self._password == '':
+            self.password = None
+
+
     @property
     def feed_id(self):
         """
@@ -232,6 +298,8 @@ class BroadcastifyArchive:
                              f'this BroadcastifyArchive. To rebuild, specify '
                              f'`rebuild=True` when calling .build()')
 
+        login_credentials_present(self.username, self._password)
+
         all_att_entries = []
         counter = 1
 
@@ -278,6 +346,8 @@ class BroadcastifyArchive:
         ##  - Get the mp3 URL
         ##  - Build an ArchiveEntry, and append to the list
         ## Instantiate the _DownloadNavigator
+        if self._verbose: print('Starting the _DownloadNavigator...')
+
         dn = _DownloadNavigator(login=True,
                                 username=self.username,
                                 password=self._password,
@@ -501,8 +571,9 @@ class _ArchiveNavigator:
 
         # Wait for page to render
         element = WebDriverWait(self.browser, 10).until_not(
-                    EC.text_to_be_present_in_element((By.XPATH, _FIRST_URI_IN_ATT_XPATH),
-                                                      self.current_first_uri))
+                    EC.text_to_be_present_in_element((
+                            By.XPATH, _first_uri_in_att_xpath),
+                            self.current_first_uri))
 
         self.current_first_uri = self.__get_current_first_uri()
 
@@ -588,7 +659,7 @@ class _ArchiveNavigator:
 
     def __get_current_first_uri(self):
         return self.browser.find_element_by_xpath(
-                    _FIRST_URI_IN_ATT_XPATH
+                    _first_uri_in_att_xpath
                     ).get_attribute('href').split('/')[-1]
 
     def open_browser(self):
@@ -598,7 +669,7 @@ class _ArchiveNavigator:
         options = Options()
         options.headless = True
         # Launch Chrome
-        self.browser = webdriver.Chrome(_WEBDRIVER_PATH, chrome_options=options)
+        self.browser = webdriver.Chrome(chrome_options=options)
 
     def close_browser(self):
         if self.verbose: print('Closing browser...')
@@ -625,24 +696,26 @@ class _DownloadNavigator:
         self.session = s = requests.Session()
         self.login = l = login
 
-        # Set post parameters
-        login_data = {
-            'username': username,
-            'password': password,
-            'action': 'auth',
-            'redirect': '/'
-        }
-
-        headers = {
-            'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) ' +
-                          'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/' +
-                          '75.0.3770.142 Safari/537.36'
-        }
-
+        # If login requested, populated login info
         if l:
-            if not username or not password:
-                raise NavigatorException(
-                        "If login=True, login credentials must be supplied.")
+            # Set post parameters
+            login_data = {
+                'username': username,
+                'password': password,
+                'action': 'auth',
+                'redirect': '/'
+            }
+
+            headers = {
+                'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) ' +
+                              'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/' +
+                              '75.0.3770.142 Safari/537.36'
+            }
+
+            # if not username or not password:
+            #     raise NavigatorException(
+            #             "No login credentials supplied for download.")
+            login_credentials_present(username, password)
 
             t.throttle()
             r = s.post(_LOGIN_URL, data=login_data, headers=headers)
