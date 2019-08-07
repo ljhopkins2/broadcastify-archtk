@@ -30,10 +30,10 @@ If you want quickly make use of BArT in your own Python project, this section is
     - More information at https://m.broadcastify.com/premium/
     - Once you have your login info, give the [BArT demo](https://github.com/ljhopkins2/BArT/blob/master/bart_demo.ipynb) a try<br><br>
 
-1. **Copy library file.** It contains the BArT source code.
+1. **Copy the library file.** It contains the BArT source code.
     - Put `bart.py` into the same directory as your `.ipynb` file<br><br>
 
-1. **Copy and modify config files.** The system needs two config files to run:
+1. **Copy and modify the config files.** The system needs two config files to run:
     - `config.ini`
         - Ensure it's in the same directory as the `.py` & `.ipynb` files
         - Edit the `MP3_OUT_PATH` value to point to where you want to store `mp3` files
@@ -52,7 +52,7 @@ If you want quickly make use of BArT in your own Python project, this section is
       1. ensure the driver is in your computer's `PATH` (here's [a great resource for Mac users](https://www.architectryan.com/2012/10/02/add-to-the-path-on-mac-os-x-mountain-lion/#.Uydjga1dXDg) on that front) OR
       1. supply a relative path to the driver (including driver name) in `config.ini` > `[selenium_config]` > `WEBDRIVER_PATH`<br><br>
 
-1. **Fulfill dependencies**. Ensure you've installed and upgraded the following Python libraries:
+1. **Fulfill the dependencies**. Ensure you've installed and upgraded the following Python libraries:
     - `BeautifulSoup4`
     - `collections`
     - `configparser`
