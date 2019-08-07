@@ -124,12 +124,18 @@ def _login_credentials_present(username, password):
         return True
 
 #-----------------------------------------------------------------------------
-# Classes
+# CLASSES
+#-----------------------------------------------------------------------------
+
+#-----------------------------------------------------------------------------
+# _NavigatorException
 #-----------------------------------------------------------------------------
 class _NavigatorException(Exception):
     pass
 
-
+#-----------------------------------------------------------------------------
+# _RequestThrottle
+#-----------------------------------------------------------------------------
 class _RequestThrottle:
     """
     Limits the pace with which requests are sent to Broadcastify's servers
@@ -150,7 +156,9 @@ class _RequestThrottle:
                 pass
             self.last_file_req = _timer()
 
-
+#-----------------------------------------------------------------------------
+# BroadcastifyArchive
+#-----------------------------------------------------------------------------
 class BroadcastifyArchive:
     def __init__(self, feed_id, username=None, password=None, verbose=True):
         """
@@ -211,6 +219,7 @@ class BroadcastifyArchive:
 
         """
         self.feed_id = feed_id
+        self.feed_name = 'Unknown'
         self.feed_url = _FEED_URL_STEM + feed_id
         self.archive_url = _ARCHIVE_FEED_STEM + feed_id
         self.username = username
@@ -244,6 +253,15 @@ class BroadcastifyArchive:
         if self._password == '':
             self.password = None
 
+        # Get the feed name
+        s = _requests.Session()
+        with s:
+            r = s.get(_FEED_URL_STEM + feed_id)
+            if r.status_code != 200:
+                raise ConnectionError(f'Problem connecting: {r.status_code}')
+
+            soup = _BeautifulSoup(r.text, 'lxml')
+            self.feed_name = soup.find('span', attrs={'class':'px13'}).text
 
     @property
     def feed_id(self):
@@ -363,7 +381,7 @@ class BroadcastifyArchive:
                                 verbose=self._verbose)
         counter = 0
 
-        ## Loop & build ArchiveEntry list
+        # Loop & build ArchiveEntry list
         for uri, end_time in all_att_entries:
             counter += 1
             if self._verbose: print(f'Building ArchiveEntry list: {counter} of '
@@ -419,7 +437,7 @@ class BroadcastifyArchive:
         if self._verbose:
             print(f'\n{len(entries_to_pass)} ArchiveEntries matched.')
 
-        # Pass them as a list to a _DownloadNavigator.get_archive_mp3s
+        # Pass them as a list to a _DownloadNavigator
         dn.get_archive_mp3s(entries_to_pass, output_path)
 
     def __parse_att(self, att_soup):
@@ -472,21 +490,19 @@ class BroadcastifyArchive:
         return(f'BroadcastifyArchive\n'
                f' ('
                f'{len(self.entries)} ArchiveEntries\n'
+               f'  feed_id = {self.feed_id}\n'
+               f'  feed_name = {self.feed_name}\n'
                f'  start date: {str(self.earliest_date)}\n'
                f'  end date:   {str(self.latest_date)}\n'
-               f'  feed_id = {self.feed_id}\n'
                f'  username = "{self.username}", pwd = [{self.password}]\n'
                f'  feed_url = "{self.feed_url}"\n'
                f'  archive_url = "{self.archive_url}"\n'
                f'  verbose = {self._verbose}'
                f')')
 
-
-
-
-# In[ ]:
-
-
+#-----------------------------------------------------------------------------
+# _ArchiveNavigator
+#-----------------------------------------------------------------------------
 class _ArchiveNavigator:
     def __init__(self, url, verbose, show_browser_ui=False):
         """
@@ -516,6 +532,8 @@ class _ArchiveNavigator:
 
         self.current_first_uri = None
 
+        self.throttle = _RequestThrottle()
+
         # Get initial page scrape & parse the calendar
         self.open_browser()
         self.__load_nav_page()
@@ -544,13 +562,12 @@ class _ArchiveNavigator:
         xpath_day = prior_day.day
 
         self.__check_browser()
+        self.throttle.throttle()
 
         # Click the day before the currently displayed day
         calendar_day = self.browser.find_element_by_xpath(
                         f"//td[@class='{xpath_class}' "
                         f"and contains(text(), '{xpath_day}')]")
-            # https://stackoverflow.com/questions/2009268/how-to-write-an-xpath-
-            # query-to-match-two-attributes
         calendar_day.click()
 
         # Refresh soup & re-parse calendar
@@ -696,9 +713,12 @@ class _ArchiveNavigator:
                f'Max Day: {str(self.archive_max_date)}, '
                f'Min Day: {str(self.archive_min_date)}, ')
 
-
+#-----------------------------------------------------------------------------
+# _DownloadNavigator
+#-----------------------------------------------------------------------------
 class _DownloadNavigator:
-    def __init__(self, login=False, username=None, password=None, verbose=False):
+    def __init__(self, login=False, username=None, password=None,
+                 verbose=False):
         self.download_page_soup = None
         self.current_archive_id = None
         self.verbose = verbose
