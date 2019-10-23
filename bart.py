@@ -123,6 +123,17 @@ def _login_credentials_present(username, password):
     else:
         return True
 
+def _get_feed_name(feed_id):
+    s = _requests.Session()
+    with s:
+        r = s.get(_FEED_URL_STEM + feed_id)
+        if r.status_code != 200:
+            raise ConnectionError(f'Problem connecting: {r.status_code}')
+
+        soup = _BeautifulSoup(r.text, 'lxml')
+
+        return soup.find('span', attrs={'class':'px13'}).text
+
 #-----------------------------------------------------------------------------
 # CLASSES
 #-----------------------------------------------------------------------------
@@ -219,7 +230,7 @@ class BroadcastifyArchive:
 
         """
         self.feed_id = feed_id
-        self.feed_name = 'Unknown'
+        self.feed_name = _get_feed_name(feed_id)
         self.feed_url = _FEED_URL_STEM + feed_id
         self.archive_url = _ARCHIVE_FEED_STEM + feed_id
         self.username = username
@@ -253,16 +264,6 @@ class BroadcastifyArchive:
         if self._password == '':
             self.password = None
 
-        # Get the feed name
-        s = _requests.Session()
-        with s:
-            r = s.get(_FEED_URL_STEM + feed_id)
-            if r.status_code != 200:
-                raise ConnectionError(f'Problem connecting: {r.status_code}')
-
-            soup = _BeautifulSoup(r.text, 'lxml')
-            self.feed_name = soup.find('span', attrs={'class':'px13'}).text
-
     @property
     def feed_id(self):
         """
@@ -273,6 +274,7 @@ class BroadcastifyArchive:
     @feed_id.setter
     def feed_id(self, value):
         self._feed_id = value
+        self.feed_name = _get_feed_name(value)
         self.entries = []
         self.earliest_date = None
         self.latest_date = None

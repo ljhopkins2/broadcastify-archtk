@@ -123,6 +123,17 @@ def _login_credentials_present(username, password):
     else:
         return True
 
+def _get_feed_name(feed_id):
+    s = _requests.Session()
+    with s:
+        r = s.get(_FEED_URL_STEM + feed_id)
+        if r.status_code != 200:
+            raise ConnectionError(f'Problem connecting: {r.status_code}')
+
+        soup = _BeautifulSoup(r.text, 'lxml')
+
+        return soup.find('span', attrs={'class':'px13'}).text
+
 #-----------------------------------------------------------------------------
 # CLASSES
 #-----------------------------------------------------------------------------
@@ -211,15 +222,15 @@ class BroadcastifyArchive:
             `entries`.
         show_browser_ui : Boolean
             If true, Selenium will open a Chrome browser window in the UI and
-            display browser activity during .build() navigation page scraping.
-            Note that no browser will be shown during mp3 filepath acquisition
-            or during .download(), since requests.Session() is used for those
-            activities.
+            display browser activity during .build() navigation page scraping;
+            otherwise, scraping will happen "invisibly". Note that no browser
+            will be shown during mp3 filepath acquisition or during .download(),
+            since requests.Session() is used for those activities.
 
 
         """
         self.feed_id = feed_id
-        self.feed_name = 'Unknown'
+        self.feed_name = _get_feed_name(feed_id)
         self.feed_url = _FEED_URL_STEM + feed_id
         self.archive_url = _ARCHIVE_FEED_STEM + feed_id
         self.username = username
@@ -253,16 +264,6 @@ class BroadcastifyArchive:
         if self._password == '':
             self.password = None
 
-        # Get the feed name
-        s = _requests.Session()
-        with s:
-            r = s.get(_FEED_URL_STEM + feed_id)
-            if r.status_code != 200:
-                raise ConnectionError(f'Problem connecting: {r.status_code}')
-
-            soup = _BeautifulSoup(r.text, 'lxml')
-            self.feed_name = soup.find('span', attrs={'class':'px13'}).text
-
     @property
     def feed_id(self):
         """
@@ -273,6 +274,7 @@ class BroadcastifyArchive:
     @feed_id.setter
     def feed_id(self, value):
         self._feed_id = value
+        self.feed_name = _get_feed_name(value)
         self.entries = []
         self.earliest_date = None
         self.latest_date = None
@@ -545,6 +547,9 @@ class _ArchiveNavigator:
         # https://www.saltycrane.com/blog/2010/10/how-get-date-n-days-ago-python/
         self.archive_min_date = self.archive_max_date - _timedelta(days=181)
 
+    def navigate_to_date(self, date):
+        pass
+
     def click_prior_day(self):
         # Calculate the prior day
         prior_day = self.active_date - _timedelta(days=1)
@@ -705,7 +710,7 @@ class _ArchiveNavigator:
     def __check_browser(self):
         if not self.browser:
             raise _NavigatorException(f"Please open a browser. And do please "
-                                     f"remember to close it when you're done.")
+                                      f"remember to close it when you're done.")
 
     def __repr__(self):
         return(f'_ArchiveNavigator(URL: {self.url}, '
@@ -758,7 +763,7 @@ class _DownloadNavigator:
         t.throttle()
         r = s.get(_ARCHIVE_DOWNLOAD_STEM + archive_id)
         if r.status_code != 200:
-            raise ConnectionError(f'Problem connecting: {r.status_code}')
+            raise ConnectionError(f'Problem connecting to {_ARCHIVE_DOWNLOAD_STEM + archive_id}: {r.status_code}')
 
         self.download_page_soup = _BeautifulSoup(r.text, 'lxml')
 
