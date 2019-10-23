@@ -761,7 +761,7 @@ class _DownloadNavigator:
         t.throttle()
         r = s.get(_ARCHIVE_DOWNLOAD_STEM + archive_id)
         if r.status_code != 200:
-            raise ConnectionError(f'Problem connecting: {r.status_code}')
+            raise ConnectionError(f'Problem connecting to {_ARCHIVE_DOWNLOAD_STEM + archive_id}: {r.status_code}')
 
         self.download_page_soup = _BeautifulSoup(r.text, 'lxml')
 
