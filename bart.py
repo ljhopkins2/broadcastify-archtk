@@ -1,4 +1,3 @@
-
 #-----------------------------------------------------------------------------
 #
 # This work is licensed under a GNU Affero General Public License v3.0. See
@@ -33,27 +32,29 @@
 #-----------------------------------------------------------------------------
 # Imports
 #-----------------------------------------------------------------------------
-import collections
-import errno
-import os
-import re
-import requests
-import pdb
+import collections as _collections
+import errno as _errno
+import os as _os
+import re as _re
+import requests as _requests
 
-from configparser import ConfigParser, ExtendedInterpolation
-from datetime import date, datetime, timedelta
-from IPython.display import clear_output
-from time import time as timer
+from configparser import ConfigParser as _ConfigParser, \
+                         ExtendedInterpolation as _ExtendedInterpolation
+from datetime import date as _date, \
+                     datetime as _datetime, \
+                     timedelta as _timedelta
+from IPython.display import clear_output as _clear_output
+from time import time as _timer
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup as _BeautifulSoup
 
-from selenium import webdriver
-from selenium.webdriver.support import wait
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
+from selenium import webdriver as _webdriver
+from selenium.webdriver.support import wait as _wait
+from selenium.webdriver.common.keys import Keys as _Keys
+from selenium.webdriver.support.ui import WebDriverWait as _WebDriverWait
+from selenium.webdriver.support import expected_conditions as _EC
+from selenium.webdriver.common.by import By as _By
+from selenium.webdriver.chrome.options import Options as _Options
 
 #-----------------------------------------------------------------------------
 # Constants & Configs
@@ -64,12 +65,12 @@ _MONTHS = ['','January', 'February', 'March',
       'July', 'August', 'September',
       'October', 'November', 'December']
 
-_config = ConfigParser(interpolation=ExtendedInterpolation())
-config_result = _config.read(_CONFIG_FILENAME)
+_config = _ConfigParser(interpolation=_ExtendedInterpolation())
+_config_result = _config.read(_CONFIG_FILENAME)
 
-if len(config_result) == 0:
-    raise FileNotFoundError(errno.ENOENT,
-                            os.strerror(errno.ENOENT),
+if len(_config_result) == 0:
+    raise FileNotFoundError(_errno.ENOENT,
+                            _os.strerror(_errno.ENOENT),
                             _CONFIG_FILENAME)
 
 # Base URLs
@@ -104,7 +105,7 @@ _AUTH_DATA_PATH = _config['authentication_path']['AUTH_DATA_PATH']
 #-----------------------------------------------------------------------------
 # Variables
 #-----------------------------------------------------------------------------
-ArchiveEntry = collections.namedtuple(
+_ArchiveEntry = _collections.namedtuple(
                                 'ArchiveEntry',
                                 'feed_id file_uri file_end_datetime mp3_url'
                                 )
@@ -115,20 +116,26 @@ _first_uri_in_att_xpath = "//a[contains(@href,'/archives/download/')]"
 #-----------------------------------------------------------------------------
 # Functions
 #-----------------------------------------------------------------------------
-def login_credentials_present(username, password):
+def _login_credentials_present(username, password):
     if not username or not password:
-        raise NavigatorException(
+        raise _NavigatorException(
                 "No login credentials supplied.")
     else:
         return True
 
 #-----------------------------------------------------------------------------
-# Classes
+# CLASSES
 #-----------------------------------------------------------------------------
-class NavigatorException(Exception):
+
+#-----------------------------------------------------------------------------
+# _NavigatorException
+#-----------------------------------------------------------------------------
+class _NavigatorException(Exception):
     pass
 
-
+#-----------------------------------------------------------------------------
+# _RequestThrottle
+#-----------------------------------------------------------------------------
 class _RequestThrottle:
     """
     Limits the pace with which requests are sent to Broadcastify's servers
@@ -136,31 +143,30 @@ class _RequestThrottle:
 
     """
     def __init__(self):
-        self.last_file_req = timer()
-        self.last_page_req = timer()
+        self.last_file_req = _timer()
+        self.last_page_req = _timer()
 
     def throttle(self, type='page'):
         if type == 'page':
-            while not timer() - self.last_page_req >= _PAGE_REQUEST_WAIT:
+            while not _timer() - self.last_page_req >= _PAGE_REQUEST_WAIT:
                 pass
-            self.last_page_req = timer()
+            self.last_page_req = _timer()
         else:
-            while not timer() - self.last_file_req >= _FILE_REQUEST_WAIT:
+            while not _timer() - self.last_file_req >= _FILE_REQUEST_WAIT:
                 pass
-            self.last_file_req = timer()
+            self.last_file_req = _timer()
 
-
+#-----------------------------------------------------------------------------
+# BroadcastifyArchive
+#-----------------------------------------------------------------------------
 class BroadcastifyArchive:
     def __init__(self, feed_id, username=None, password=None, verbose=True):
         """
         A container for Broadcastify feed archive data, and an enginge for re-
         trieving archive entry information and downloading the corresponding mp3
-        files. Initializes to an empty container. Non-standard dependencies in-
-        clude:
-            - Selenium (pip install selenium)
-            - The WebDriver for Chrome (https://chromedriver.chromium.org/
-              downloads)
-            - BeautifulSoup 4 (pip install beautifulsoup4)
+        files. Initializes to an empty container. See user documentation for
+        information about dependencies (including Selenium, the WebDriver for
+        Chrome, and BeautifulSoup 4).
 
         Parameters
         ----------
@@ -203,10 +209,17 @@ class BroadcastifyArchive:
         latest_date   : datetime
             The datetime of the earliest/latest archive entry currently in
             `entries`.
+        show_browser_ui : Boolean
+            If true, Selenium will open a Chrome browser window in the UI and
+            display browser activity during .build() navigation page scraping;
+            otherwise, scraping will happen "invisibly". Note that no browser
+            will be shown during mp3 filepath acquisition or during .download(),
+            since requests.Session() is used for those activities.
 
 
         """
         self.feed_id = feed_id
+        self.feed_name = 'Unknown'
         self.feed_url = _FEED_URL_STEM + feed_id
         self.archive_url = _ARCHIVE_FEED_STEM + feed_id
         self.username = username
@@ -214,6 +227,7 @@ class BroadcastifyArchive:
         self.entries = []
         self.earliest_date = None
         self.latest_date = None
+        self.show_browser_ui = False
 
         self._an = None
         self._verbose = verbose
@@ -224,8 +238,8 @@ class BroadcastifyArchive:
             config_result = _config.read(_AUTH_DATA_PATH)
 
             if len(config_result) == 0:
-                raise FileNotFoundError(errno.ENOENT,
-                                        os.strerror(errno.ENOENT),
+                raise FileNotFoundError(_errno.ENOENT,
+                                        _os.strerror(_errno.ENOENT),
                                         _AUTH_DATA_PATH)
 
             self.username = _config['authentication_data']['username']
@@ -239,6 +253,15 @@ class BroadcastifyArchive:
         if self._password == '':
             self.password = None
 
+        # Get the feed name
+        s = _requests.Session()
+        with s:
+            r = s.get(_FEED_URL_STEM + feed_id)
+            if r.status_code != 200:
+                raise ConnectionError(f'Problem connecting: {r.status_code}')
+
+            soup = _BeautifulSoup(r.text, 'lxml')
+            self.feed_name = soup.find('span', attrs={'class':'px13'}).text
 
     @property
     def feed_id(self):
@@ -298,7 +321,7 @@ class BroadcastifyArchive:
                              f'this BroadcastifyArchive. To rebuild, specify '
                              f'`rebuild=True` when calling .build()')
 
-        login_credentials_present(self.username, self._password)
+        _login_credentials_present(self.username, self._password)
 
         all_att_entries = []
         counter = 1
@@ -315,7 +338,11 @@ class BroadcastifyArchive:
         if self._verbose: print('Starting the _ArchiveNavigator...')
 
         # Instantiate the _ArchiveNavigator
-        self.an = _ArchiveNavigator(self.archive_url, self._verbose)
+        self.an = _ArchiveNavigator(self.archive_url,
+                                    self._verbose,
+                                    show_browser_ui=self.show_browser_ui)
+
+        print(f'Show browser is {self.show_browser_ui}')
 
         # Add the current (zero-th) day's ATT entries
         # (file_uri & file_end_date_time)
@@ -354,17 +381,17 @@ class BroadcastifyArchive:
                                 verbose=self._verbose)
         counter = 0
 
-        ## Loop & build ArchiveEntry list
+        # Loop & build ArchiveEntry list
         for uri, end_time in all_att_entries:
             counter += 1
             if self._verbose: print(f'Building ArchiveEntry list: {counter} of '
                                     f'{len(all_att_entries)}')
-            clear_output(wait=True)
+            _clear_output(wait=True)
 
             mp3_soup = dn.get_download_soup(uri)
             mp3_path = self.__parse_mp3_path(mp3_soup)
 
-            self.entries.append(ArchiveEntry(self.feed_id,
+            self.entries.append(_ArchiveEntry(self.feed_id,
                                              uri,
                                              end_time,
                                              mp3_path))
@@ -394,8 +421,8 @@ class BroadcastifyArchive:
         entries_to_pass = []
         dn = _DownloadNavigator(login=False, verbose=self._verbose)
 
-        if not start: start = datetime(1,1,1,0,0)
-        if not end: end = datetime(9999,12,31,0,0)
+        if not start: start = _datetime(1,1,1,0,0)
+        if not end: end = _datetime(9999,12,31,0,0)
 
         if self._verbose:
             print(f'Retrieving list of ArchiveEntries...\n'
@@ -410,7 +437,7 @@ class BroadcastifyArchive:
         if self._verbose:
             print(f'\n{len(entries_to_pass)} ArchiveEntries matched.')
 
-        # Pass them as a list to a _DownloadNavigator.get_archive_mp3s
+        # Pass them as a list to a _DownloadNavigator
         dn.get_archive_mp3s(entries_to_pass, output_path)
 
     def __parse_att(self, att_soup):
@@ -450,36 +477,34 @@ class BroadcastifyArchive:
 
     def __get_entry_end_datetime(self, time):
         """Convert the archive entry end time to datetime"""
-        hhmm = datetime.strptime(time, '%I:%M %p')
-        return datetime.combine(self.an.active_date, datetime.time(hhmm))
+        hhmm = _datetime.strptime(time, '%I:%M %p')
+        return _datetime.combine(self.an.active_date, _datetime.time(hhmm))
 
     def __parse_mp3_path(self, download_page_soup):
         """Parse the mp3 filepath from a BeautifulSoup of the download page"""
         return download_page_soup.find('a',
-                                       {'href': re.compile('.mp3')}
+                                       {'href': _re.compile('.mp3')}
                                        ).attrs['href']
 
     def __repr__(self):
         return(f'BroadcastifyArchive\n'
                f' ('
                f'{len(self.entries)} ArchiveEntries\n'
+               f'  feed_id = {self.feed_id}\n'
+               f'  feed_name = {self.feed_name}\n'
                f'  start date: {str(self.earliest_date)}\n'
                f'  end date:   {str(self.latest_date)}\n'
-               f'  feed_id = {self.feed_id}\n'
                f'  username = "{self.username}", pwd = [{self.password}]\n'
                f'  feed_url = "{self.feed_url}"\n'
                f'  archive_url = "{self.archive_url}"\n'
                f'  verbose = {self._verbose}'
                f')')
 
-
-
-
-# In[ ]:
-
-
+#-----------------------------------------------------------------------------
+# _ArchiveNavigator
+#-----------------------------------------------------------------------------
 class _ArchiveNavigator:
-    def __init__(self, url, verbose):
+    def __init__(self, url, verbose, show_browser_ui=False):
         """
         Utility for navigating the archive feed.
 
@@ -498,6 +523,7 @@ class _ArchiveNavigator:
         self.calendar_soup = None
         self.att_soup = None
         self.browser = None
+        self.show_browser_ui = show_browser_ui
         self.verbose = verbose
 
         self.active_date = None # currently displayed date
@@ -505,6 +531,8 @@ class _ArchiveNavigator:
         self.month_min_date = None # earliest day w/ entries in displayed month
 
         self.current_first_uri = None
+
+        self.throttle = _RequestThrottle()
 
         # Get initial page scrape & parse the calendar
         self.open_browser()
@@ -515,11 +543,14 @@ class _ArchiveNavigator:
         self.archive_max_date = self.active_date
 
         # https://www.saltycrane.com/blog/2010/10/how-get-date-n-days-ago-python/
-        self.archive_min_date = self.archive_max_date - timedelta(days=181)
+        self.archive_min_date = self.archive_max_date - _timedelta(days=181)
+
+    def navigate_to_date(self, date):
+        pass
 
     def click_prior_day(self):
         # Calculate the prior day
-        prior_day = self.active_date - timedelta(days=1)
+        prior_day = self.active_date - _timedelta(days=1)
 
         # Would this take us past the archive? If so, stop.
         if prior_day < self.archive_min_date:
@@ -534,13 +565,12 @@ class _ArchiveNavigator:
         xpath_day = prior_day.day
 
         self.__check_browser()
+        self.throttle.throttle()
 
         # Click the day before the currently displayed day
         calendar_day = self.browser.find_element_by_xpath(
                         f"//td[@class='{xpath_class}' "
                         f"and contains(text(), '{xpath_day}')]")
-            # https://stackoverflow.com/questions/2009268/how-to-write-an-xpath-
-            # query-to-match-two-attributes
         calendar_day.click()
 
         # Refresh soup & re-parse calendar
@@ -557,9 +587,9 @@ class _ArchiveNavigator:
         self.browser.get(self.url)
 
         # Wait for page to render
-        element = WebDriverWait(self.browser, 10).until(
-                  EC.presence_of_element_located((By.CLASS_NAME,
-                                                  "cursor-link")))
+        element = _WebDriverWait(self.browser, 10).until(
+                  _EC.presence_of_element_located((_By.CLASS_NAME,
+                                                   "cursor-link")))
 
         # Get current_first_uri, if none populated
         if not self.current_first_uri:
@@ -570,15 +600,15 @@ class _ArchiveNavigator:
         self.__check_browser()
 
         # Wait for page to render
-        element = WebDriverWait(self.browser, 10).until_not(
-                    EC.text_to_be_present_in_element((
-                            By.XPATH, _first_uri_in_att_xpath),
+        element = _WebDriverWait(self.browser, 10).until_not(
+                    _EC.text_to_be_present_in_element((
+                            _By.XPATH, _first_uri_in_att_xpath),
                             self.current_first_uri))
 
         self.current_first_uri = self.__get_current_first_uri()
 
         # Scrape page content
-        soup = BeautifulSoup(self.browser.page_source, 'lxml')
+        soup = _BeautifulSoup(self.browser.page_source, 'lxml')
 
         # Isolate the calendar and the archiveTimes table
         self.calendar_soup = soup.find('table',
@@ -634,13 +664,13 @@ class _ArchiveNavigator:
         month_min_day = int(self.__parse_month_min_day(days_on_calendar))
 
         # Set class attributes
-        self.active_date = date(displayed_year,
+        self.active_date = _date(displayed_year,
                                 displayed_month,
                                 active_day)
-        self.month_min_date = date(displayed_year,
+        self.month_min_date = _date(displayed_year,
                                    displayed_month,
                                    month_min_day)
-        self.month_max_date = date(displayed_year,
+        self.month_max_date = _date(displayed_year,
                                    displayed_month,
                                    month_max_day)
 
@@ -665,11 +695,11 @@ class _ArchiveNavigator:
     def open_browser(self):
         if self.verbose: print('Opening browser...')
 
-        # Make Chrome invisible, comment if you want to see it in action...
-        options = Options()
-        options.headless = True
+        # Set whether to show browser UI while fetching
+        options = _Options()
+        options.headless = ~self.show_browser_ui
         # Launch Chrome
-        self.browser = webdriver.Chrome(chrome_options=options)
+        self.browser = _webdriver.Chrome(chrome_options=options)
 
     def close_browser(self):
         if self.verbose: print('Closing browser...')
@@ -677,8 +707,8 @@ class _ArchiveNavigator:
 
     def __check_browser(self):
         if not self.browser:
-            raise NavigatorException(f"Please open a browser. And do please "
-                                     f"remember to close it when you're done.")
+            raise _NavigatorException(f"Please open a browser. And do please "
+                                      f"remember to close it when you're done.")
 
     def __repr__(self):
         return(f'_ArchiveNavigator(URL: {self.url}, '
@@ -686,14 +716,17 @@ class _ArchiveNavigator:
                f'Max Day: {str(self.archive_max_date)}, '
                f'Min Day: {str(self.archive_min_date)}, ')
 
-
+#-----------------------------------------------------------------------------
+# _DownloadNavigator
+#-----------------------------------------------------------------------------
 class _DownloadNavigator:
-    def __init__(self, login=False, username=None, password=None, verbose=False):
+    def __init__(self, login=False, username=None, password=None,
+                 verbose=False):
         self.download_page_soup = None
         self.current_archive_id = None
         self.verbose = verbose
         self.throttle = t = _RequestThrottle()
-        self.session = s = requests.Session()
+        self.session = s = _requests.Session()
         self.login = l = login
 
         # If login requested, populated login info
@@ -712,10 +745,7 @@ class _DownloadNavigator:
                               '75.0.3770.142 Safari/537.36'
             }
 
-            # if not username or not password:
-            #     raise NavigatorException(
-            #             "No login credentials supplied for download.")
-            login_credentials_present(username, password)
+            _login_credentials_present(username, password)
 
             t.throttle()
             r = s.post(_LOGIN_URL, data=login_data, headers=headers)
@@ -733,12 +763,12 @@ class _DownloadNavigator:
         if r.status_code != 200:
             raise ConnectionError(f'Problem connecting: {r.status_code}')
 
-        self.download_page_soup = BeautifulSoup(r.text, 'lxml')
+        self.download_page_soup = _BeautifulSoup(r.text, 'lxml')
 
         return self.download_page_soup
 
     def get_archive_mp3s(self, archive_entries, filepath):
-        start = timer()
+        start = _timer()
 
         for file in archive_entries:
             feed_id =  file.feed_id
@@ -758,7 +788,7 @@ class _DownloadNavigator:
             #self.throttle.throttle('file')
             self.__fetch_mp3([out_file_name, file_url])
 
-        duration = timer() - start
+        duration = _timer() - start
 
         if len(archive_entries) > 0: print('\nDownloads complete.')
         if self.verbose:
@@ -770,9 +800,9 @@ class _DownloadNavigator:
         # download-files-requests/
         path, uri = entry
 
-        if not os.path.exists(path):
+        if not _ospath.exists(path):
             self.throttle.throttle('file')
-            r = requests.get(uri, stream=True)
+            r = _requests.get(uri, stream=True)
             if r.status_code == 200:
                 with open(path, 'wb') as f:
                     for chunk in r:
@@ -784,11 +814,11 @@ class _DownloadNavigator:
 
     def __format_entry_date(self, date):
         # Format the ArchiveEntry end time as YYYYMMDD-HHMM
-        year = date.year
-        month = date.month
-        day = date.day
-        hour = date.hour
-        minute = date.minute
+        year = _date.year
+        month = _date.month
+        day = _date.day
+        hour = _date.hour
+        minute = _date.minute
 
         return '-'.join([str(year) + str(month).zfill(2) + str(day).zfill(2),
                          str(hour).zfill(2) + str(minute).zfill(2)])
