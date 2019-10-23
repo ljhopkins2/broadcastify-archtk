@@ -46,7 +46,7 @@ If you want quickly make use of BArT in your own Python project, this section is
 1. **Install selenium**. Selenium is a browser emulator used to interact with Broadcastify's archive navigation tools.
     - Install with `pip install -U selenium`<br><br>
     
-1. **Get a browser driver**. Selenium requires a driver to interface with your chosen browser. All testing for BArT is done with the Chrome browser driver (currently v76.0).
+1. **Get a browser driver**. Selenium requires a driver to interface with your chosen browser. All testing for BArT is done with the Chrome browser driver (currently v77).
     - Install [Chrome's browser driver](https://sites.google.com/a/chromium.org/chromedriver/downloads), or the browser of your choice (see [the list on the selenium pyPI page](https://pypi.org/project/selenium/)
     - You must either 
       1. ensure the driver is in your computer's `PATH` (here's [a great resource for Mac users](https://www.architectryan.com/2012/10/02/add-to-the-path-on-mac-os-x-mountain-lion/#.Uydjga1dXDg) on that front) OR
