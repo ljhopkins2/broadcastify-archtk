@@ -74,3 +74,5 @@ If you want quickly make use of BArT in your own Python project, this section is
 ### Use Case Walk-throughs
 
 ## FAQ
+* How are Broadcastify archive pages structured?<br>
+![broadcastify page structure](assets/img/broadcastify_page_struct.png)
