@@ -332,23 +332,21 @@ class BroadcastifyArchive:
         try:
             days_back = int(days_back)
             if days_back < 0: days_back = 0
-            days_back += 1
         except (TypeError):
             raise TypeError(f'The `days_back` parameter needs an integer '
                             f'between 0 and 180.')
 
-        if self._verbose: print('Starting the _ArchiveNavigator...')
+        if self._verbose: print('Starting the ArchiveNavigator...')
+        print(f'\tShow browser is {self.show_browser_ui}')
 
         # Instantiate the _ArchiveNavigator
         self.an = _ArchiveNavigator(self.archive_url,
                                     self._verbose,
                                     show_browser_ui=self.show_browser_ui)
 
-        print(f'Show browser is {self.show_browser_ui}')
-
         # Add the current (zero-th) day's ATT entries
         # (file_uri & file_end_date_time)
-        if self._verbose: print(f'Parsing day {counter} of {days_back}: '
+        if self._verbose: print(f'Parsing day 0 of {days_back}: '
                                 f'{self.an.active_date}')
 
         all_att_entries = self.__parse_att(self.an.att_soup)
@@ -356,47 +354,58 @@ class BroadcastifyArchive:
         self.earliest_date = all_att_entries[-1][1]
 
         # For each day requested...
-        for day in range(1, days_back):
+        for day in range(1, days_back + 1):
+            if self._verbose: print(f'Parsing day {day} of {days_back}: '
+                                    f'{self.an.active_date}')
+
             # If clicking the prior day takes us past the beginning of the
             #archive, stop.
             if not self.an.click_prior_day(): break
-
-            counter += 1
-            if self._verbose: print(f'Parsing day {counter} of {days_back}: '
-                                    f'{self.an.active_date}')
 
             # Get the ATT entries (file_uri & file_end_date_time)
             all_att_entries.extend(self.__parse_att(self.an.att_soup))
             self.earliest_date = all_att_entries[-1][1]
 
+            _clear_output(wait=True)
+
         self.an.close_browser()
+
+        # Store URIs and end times in the entries attritbute
+        for entry in all_att_entries:
+            entry_dict = {
+                'feed_id': self.feed_id,
+                'uri': entry[0],
+                'end_time': entry[1]
+            }
+
+            self.entries.append(entry_dict)
 
         # Iterate through ATT entries to
         ##  - Get the mp3 URL
         ##  - Build an ArchiveEntry, and append to the list
         ## Instantiate the _DownloadNavigator
-        if self._verbose: print('Starting the _DownloadNavigator...')
-
-        dn = _DownloadNavigator(login=True,
-                                username=self.username,
-                                password=self._password,
-                                verbose=self._verbose)
-        counter = 0
-
+        # if self._verbose: print('Starting the _DownloadNavigator...')
+        #
+        # dn = _DownloadNavigator(login=True,
+        #                         username=self.username,
+        #                         password=self._password,
+        #                         verbose=self._verbose)
+        # counter = 0
+        #
         # Loop & build ArchiveEntry list
-        for uri, end_time in all_att_entries:
-            counter += 1
-            if self._verbose: print(f'Building ArchiveEntry list: {counter} of '
-                                    f'{len(all_att_entries)}')
-            _clear_output(wait=True)
-
-            mp3_soup = dn.get_download_soup(uri)
-            mp3_path = self.__parse_mp3_path(mp3_soup)
-
-            self.entries.append(_ArchiveEntry(self.feed_id,
-                                             uri,
-                                             end_time,
-                                             mp3_path))
+        # for uri, end_time in all_att_entries:
+        #     counter += 1
+        #     if self._verbose: print(f'Building ArchiveEntry list: {counter} of '
+        #                             f'{len(all_att_entries)}')
+        #     _clear_output(wait=True)
+        #
+        #     mp3_soup = dn.get_download_soup(uri)
+        #     mp3_path = self.__parse_mp3_path(mp3_soup)
+        #
+        #     self.entries.append(_ArchiveEntry(self.feed_id,
+        #                                      uri,
+        #                                      end_time,
+        #                                      mp3_path))
 
         if self._verbose:
             print(f'Archive build complete.')
@@ -421,7 +430,10 @@ class BroadcastifyArchive:
         """
         entries = self.entries
         entries_to_pass = []
-        dn = _DownloadNavigator(login=False, verbose=self._verbose)
+        dn = _DownloadNavigator(login=True,
+                                username=self.username,
+                                password=self._password,
+                                verbose=self._verbose)
 
         if not start: start = _datetime(1,1,1,0,0)
         if not end: end = _datetime(9999,12,31,0,0)
@@ -433,8 +445,8 @@ class BroadcastifyArchive:
 
         # Remove out-of-date-range entries from self.entries
         entries_to_pass = [entry for entry in entries if
-                           entry.file_end_datetime >= start and
-                           entry.file_end_datetime <= end]
+                           entry['end_time'] >= start and
+                           entry['end_time'] <= end]
 
         if self._verbose:
             print(f'\n{len(entries_to_pass)} ArchiveEntries matched.')
@@ -482,16 +494,16 @@ class BroadcastifyArchive:
         hhmm = _datetime.strptime(time, '%I:%M %p')
         return _datetime.combine(self.an.active_date, _datetime.time(hhmm))
 
-    def __parse_mp3_path(self, download_page_soup):
-        """Parse the mp3 filepath from a BeautifulSoup of the download page"""
-        return download_page_soup.find('a',
-                                       {'href': _re.compile('.mp3')}
-                                       ).attrs['href']
+    # def __parse_mp3_path(self, download_page_soup):
+    #     """Parse the mp3 filepath from a BeautifulSoup of the download page"""
+    #     return download_page_soup.find('a',
+    #                                    {'href': _re.compile('.mp3')}
+    #                                    ).attrs['href']
 
     def __repr__(self):
         return(f'BroadcastifyArchive\n'
                f' ('
-               f'{len(self.entries)} ArchiveEntries\n'
+               f'{len(self.entries)} entries\n'
                f'  feed_id = {self.feed_id}\n'
                f'  feed_name = {self.feed_name}\n'
                f'  start date: {str(self.earliest_date)}\n'
@@ -598,7 +610,7 @@ class _ArchiveNavigator:
             self.current_first_uri = self.__get_current_first_uri()
 
     def __scrape_nav_page(self):
-        if self.verbose: print('Scraping navigation page...')
+        if self.verbose: print('\tScraping navigation page...')
         self.__check_browser()
 
         # Wait for page to render
@@ -642,7 +654,7 @@ class _ArchiveNavigator:
 
 
         """
-        if self.verbose: print('Parsing calendar...')
+        if self.verbose: print('\tParsing calendar...')
 
         # Get the tags representing the days currently displayed on the calendar
         days_on_calendar = self.calendar_soup.find_all('td')
@@ -702,7 +714,7 @@ class _ArchiveNavigator:
         if not self.show_browser_ui:
             options.add_argument('--headless')
             options.add_argument('--disable-gpu')
-            
+
         # Launch Chrome
         self.browser = _webdriver.Chrome(chrome_options=options)
 
@@ -777,21 +789,24 @@ class _DownloadNavigator:
         start = _timer()
 
         for file in archive_entries:
-            feed_id =  file.feed_id
-            archive_uri = file.file_uri
-            file_date = self.__format_entry_date(file.file_end_datetime)
-            file_url = file.mp3_url
+            feed_id =  file['feed_id']
+            archive_uri = file['uri']
+            file_date = self.__format_entry_date(file['end_time'])
+
+            print(f'Downloading {archive_entries.index(file) + 1} of '
+                  f'{len(archive_entries)}')
 
             # Build the path for saving the downloaded .mp3
             out_file_name = filepath + '-'.join([feed_id, file_date]) + '.mp3'
 
-            print(f'Downloading {archive_entries.index(file) + 1} of '
-                  f'{len(archive_entries)}')
+            # Get the URL of the mp3 file
+            mp3_soup = self.get_download_soup(archive_uri)
+            file_url = self.__parse_mp3_path(mp3_soup)
+
             if self.verbose:
                 print(f'\tfrom {file_url}')
                 print(f'\tto {out_file_name}')
 
-            #self.throttle.throttle('file')
             self.__fetch_mp3([out_file_name, file_url])
 
         duration = _timer() - start
@@ -800,6 +815,12 @@ class _DownloadNavigator:
         if self.verbose:
             print(f'\nRetrieved {len(archive_entries)} files in '
                   f'{round(duration,4)} seconds.')
+
+    def __parse_mp3_path(self, download_page_soup):
+        """Parse the mp3 filepath from a BeautifulSoup of the download page"""
+        return download_page_soup.find('a',
+                                       {'href': _re.compile('.mp3')}
+                                       ).attrs['href']
 
     def __fetch_mp3(self, entry):
         # h/t https://markhneedham.com/blog/2018/07/15/python-parallel-
