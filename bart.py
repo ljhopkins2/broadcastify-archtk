@@ -106,7 +106,7 @@ _AUTH_DATA_PATH = _config['authentication_path']['AUTH_DATA_PATH']
 # Variables
 #-----------------------------------------------------------------------------
 _ArchiveEntry = _collections.namedtuple(
-                                'ArchiveEntry',
+                                '_ArchiveEntry',
                                 'feed_id file_uri file_end_datetime mp3_url'
                                 )
 
@@ -802,7 +802,7 @@ class _DownloadNavigator:
         # download-files-requests/
         path, uri = entry
 
-        if not _ospath.exists(path):
+        if not _os.path.exists(path):
             self.throttle.throttle('file')
             r = _requests.get(uri, stream=True)
             if r.status_code == 200:
@@ -816,11 +816,11 @@ class _DownloadNavigator:
 
     def __format_entry_date(self, date):
         # Format the ArchiveEntry end time as YYYYMMDD-HHMM
-        year = _date.year
-        month = _date.month
-        day = _date.day
-        hour = _date.hour
-        minute = _date.minute
+        year = date.year
+        month = date.month
+        day = date.day
+        hour = date.hour
+        minute = date.minute
 
         return '-'.join([str(year) + str(month).zfill(2) + str(day).zfill(2),
                          str(hour).zfill(2) + str(minute).zfill(2)])
