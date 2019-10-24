@@ -699,7 +699,10 @@ class _ArchiveNavigator:
 
         # Set whether to show browser UI while fetching
         options = _Options()
-        options.headless = ~self.show_browser_ui
+        if not self.show_browser_ui:
+            options.add_argument('--headless')
+            options.add_argument('--disable-gpu')
+
         # Launch Chrome
         self.browser = _webdriver.Chrome(chrome_options=options)
 
