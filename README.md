@@ -36,7 +36,7 @@ If you want quickly make use of BArT in your own Python project, this section is
 1. **Copy and modify the config files.** The system needs two config files to run:
     - `config.ini`
         - Ensure it's in the same directory as the `.py` & `.ipynb` files
-        - Edit the `MP3_OUT_PATH` value to point to where you want to store `mp3` files. Note that _the directory must exist before using the archive_, or you'll get an error
+        - Edit the `MP3_OUT_PATH` value to point to where you want to store `mp3` files. Note that _the directory must exist before downloading archive files_, or you'll get an error
         - Edit the `AUTH_DATA_PATH` value to point to your `pwd.ini`
     - `pwd.ini`
         - Use the [`sample_pwd.ini`](https://github.com/ljhopkins2/BArT/blob/master/sample_pwd.ini) in this repo as a template
