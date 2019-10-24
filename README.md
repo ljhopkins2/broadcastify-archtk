@@ -1,6 +1,6 @@
 # Broadcastify ARchive Toolkit (BArT)<br>Documentation
 
-**Version 0.2**<br>
+**Version 0.5**<br>
 ```
    |\/\/\/|  +------------------------+
    |      |  | Eat my shortwave, man. |
