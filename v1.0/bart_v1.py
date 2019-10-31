@@ -542,7 +542,7 @@ class BroadcastifyArchive:
                                 verbose=self._verbose)
 
         if self._verbose:
-            print(f'{{':,'}len(filtered_entries)} archive entries matched.')
+            print(f'{'{:,}'len(filtered_entries)} archive entries matched.')
 
         # Pass them to _DownloadNavigator to get the files
         dn.get_archive_mp3s(filtered_entries, output_path)

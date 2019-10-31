@@ -9,7 +9,6 @@
 #-----------------------------------------------------------------------------
 #
 # The _B_roadcastify _AR_chive _T_oolkit
-# version 0.6
 #
 #   |\/\/\/|  +------------------------+
 #   |      |  | Eat my shortwave, man. |
@@ -543,7 +542,7 @@ class BroadcastifyArchive:
                                 verbose=self._verbose)
 
         if self._verbose:
-            print(f'{{':,'}len(filtered_entries)} archive entries matched.')
+            print(f'{len(filtered_entries)} archive entries matched.')
 
         # Pass them to _DownloadNavigator to get the files
         dn.get_archive_mp3s(filtered_entries, output_path)
@@ -610,15 +609,15 @@ class BroadcastifyArchive:
         return (start, end)
 
     def __repr__(self):
-        repr = f'BroadcastifyArchive\n'
-               f' (Feed ID = {self.feed_id}\n'
-               f'  Feed Name = {self.feed_name}\n'
-               f'  Feed URL = "{self.feed_url}"\n'
-               f'  Archive URL = "{self.archive_url}"\n'
-               f'  Start Date: {str(self.start_date)}\n'
-               f'  End Date:   {str(self.end_date)}\n'
-               f'  Username = "{self.username}" Password = [{self.password}]\n'
-               f'  {'{:,}'.format(len(self.entries)} parsed archive entries '
+        repr = f'BroadcastifyArchive\n' + \
+               f' (Feed ID = {self.feed_id}\n' + \
+               f'  Feed Name = {self.feed_name}\n' + \
+               f'  Feed URL = "{self.feed_url}"\n' + \
+               f'  Archive URL = "{self.archive_url}"\n' + \
+               f'  Start Date: {str(self.start_date)}\n' + \
+               f'  End Date:   {str(self.end_date)}\n' + \
+               f'  Username = "{self.username}" Password = [{self.password}]\n' + \
+               f"  {'{:,}'.format(len(self.entries))} parsed archive entries "
 
         if not (self.earliest_entry and self.latest_entry):
             repr += f'between {self.earliest_entry} and {self.latest_entry}'
