@@ -1,19 +1,8 @@
-# Broadcastify ARchive Toolkit (BArT)<br>Documentation
+# Broadcastify ARchive Toolkit (BArT)
 
-**Version 0.5**<br>
-```
-   |\/\/\/|  +------------------------+
-   |      |  | Eat my shortwave, man. |
-   |      |  +------------------------+
-   | (o)(o)    /
-   C      _)  /
-    | ,___|
-    |   /
-   /____\
-  /      \
-```
-<sub><sup>Artwork source: https://www.asciiart.eu/cartoons/simpsons</sub></sup>
-<br><br>
+**Version 0.6**<br>
+_Updated 31 Oct 2019_
+
 ## Preface
 
 The Broadcastify Archive Tool (BArT) automates downloading audio archives from [Broadcastify](www.broadcastify.com), "the world's largest source of Public Safety, Airline, Rail, and Marine live audio streams".
@@ -24,11 +13,11 @@ BArT solves that problem.
 
 ## Quick-start Guide
 
-If you want quickly make use of BArT in your own Python project, this section is for you!
+If you want quickly make use of BArT in your own project, this section is for you! The instructions assume you're using a Jupyter Notebook and python.
 
 1. **Get a Broadcastify Premium account.** Access to the archives is behind a paywall. For $15, you can get 180 days of preimium access.
     - More information at https://m.broadcastify.com/premium/
-    - Once you have your login info, give the [BArT demo](https://github.com/ljhopkins2/BArT/blob/master/bart_demo.ipynb) a try<br><br>
+
 
 1. **Copy the library file.** It contains the BArT source code.
     - Put `bart.py` into the same directory as your `.ipynb` file<br><br>
@@ -45,10 +34,10 @@ If you want quickly make use of BArT in your own Python project, this section is
 
 1. **Install selenium**. Selenium is a browser emulator used to interact with Broadcastify's archive navigation tools.
     - Install with `pip install -U selenium`<br><br>
-    
+
 1. **Get a browser driver**. Selenium requires a driver to interface with your chosen browser. All testing for BArT is done with the Chrome browser driver (currently v77).
     - Install [Chrome's browser driver](https://sites.google.com/a/chromium.org/chromedriver/downloads), or the browser of your choice (see [the list on the selenium pyPI page](https://pypi.org/project/selenium/)
-    - You must either 
+    - You must either
       1. ensure the driver is in your computer's `PATH` (here's [a great resource for Mac users](https://www.architectryan.com/2012/10/02/add-to-the-path-on-mac-os-x-mountain-lion/#.Uydjga1dXDg) on that front) OR
       1. supply a relative path to the driver (including driver name) in `config.ini` > `[selenium_config]` > `WEBDRIVER_PATH`<br><br>
 
@@ -63,16 +52,29 @@ If you want quickly make use of BArT in your own Python project, this section is
     - `requests`
     - `time`<br><br>
 
-## <span style="color:red">**DOCUMENTATION UNDER DEVELOPMENT**</span>
+1. **Take a test spin.** Give the [BArT demo](https://github.com/ljhopkins2/BArT/blob/master/bart_demo.ipynb) a try.
+
+## <span style="color:red">**USER DOCUMENTATION UNDER DEVELOPMENT**</span>
 
 **_This project is just getting under way. Some documentation is included in the docstrings of the `.py` file. Stay tuned for more complete user documentation._**
 
-## Longer, but More Thorough, Guide
-
-### Object Model
-
-### Use Case Walk-throughs
 
 ## FAQ
 * How are Broadcastify archive pages structured?<br>
 ![broadcastify page structure](assets/img/broadcastify_page_struct.png)
+<br><br>
+----
+```
+   |\/\/\/|  +------------------------+
+   |      |  | Eat my shortwave, man. |
+   |      |  +------------------------+
+   | (o)(o)    /
+   C      _)  /
+    | ,___|
+    |   /
+   /____\
+  /      \
+```
+<sub><sup>Artwork source: https://www.asciiart.eu/cartoons/simpsons</sub></sup>
+
+----

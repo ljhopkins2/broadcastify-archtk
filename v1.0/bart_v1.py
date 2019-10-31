@@ -36,12 +36,10 @@ import errno as _errno
 import os as _os
 import re as _re
 import requests as _requests
+import datetime as _dt
 
 from configparser import ConfigParser as _ConfigParser, \
                          ExtendedInterpolation as _ExtendedInterpolation
-from datetime import date as _date, \
-                     datetime as _datetime, \
-                     timedelta as _timedelta
 from IPython.display import clear_output as _clear_output
 from time import time as _timer
 
@@ -162,6 +160,24 @@ class _text_to_be_present_in_href(object):
             return False
 
 #-----------------------------------------------------------------------------
+# _att_to_be_updated
+#-----------------------------------------------------------------------------
+class _att_to_be_updated(object):
+    """
+    A CUSTOM Selenium expectation for checking whether the ArchiveTimesTable has
+    been updated.
+    """
+    def __init__(self, archive_navigator):
+        self.an = archive_navigator
+        self.page_last_updated = self.an.page_last_updated
+
+    def __call__(self, driver):
+        try:
+            return self.page_last_updated != self.an._set_last_page_update()
+        except:
+            return False
+
+#-----------------------------------------------------------------------------
 # _NavigatorException
 #-----------------------------------------------------------------------------
 class _NavigatorException(Exception):
@@ -230,30 +246,32 @@ class BroadcastifyArchive:
             Full https URL for the feed's main "listen" page.
         archive_url : str
             Full https URL for the feed's archive page.
-        entries : (ArchiveEntry named tuple)
+        entries : dictionary
             Container for archive entry information.
             feed_id : str
-                Same as feed_id parameter
-            file_uri : str
-                The unique ID for an individual archive file page, which cor-
-                responds to a feed's transmissions over a ~30-minute period on a
-                given date. Can be used to find the mp3 file's individual down-
-                load page. This page is password protected and limited to pre-
-                mium account holders.
-            file_end_date_time : str
-                Date and end time of the individual archive file.
+                [Populated at .build] Same as feed_id parameter.
+            uri : str
+                [Populated at .build] The unique ID for an individual archive
+                file page, which corresponds to a feed's transmissions over a
+                ~30-minute period on a given date. Can be used to find the mp3
+                file's individual download page. This page is password protected
+                and limited to premium account holders.
+            start_time : datetime
+                [Populated at .build] Beginning time of the archive entry.
+            end_time : datetime
+                [Populated at .build] Ending time of the archive entry.
             mp3_url : str
-                The URL of the corresponding mp3 file.
-        earliest_date : datetime
-        latest_date   : datetime
+                [Populated at .download] The URL of the corresponding mp3 file.
+        earliest_entry : datetime
+        latest_entry   : datetime
             The datetime of the earliest/latest archive entry currently in
             `entries`.
         show_browser_ui : Boolean
             If true, Selenium will open a Chrome browser window in the UI and
             display browser activity during .build() navigation page scraping;
             otherwise, scraping will happen "invisibly". Note that no browser
-            will be shown during mp3 filepath acquisition or during .download(),
-            since requests.Session() is used for those activities.
+            will be shown during archive initialization or .download(), since
+            requests.Session() is used for those activities.
         """
 
         self.feed_id = feed_id
@@ -346,19 +364,15 @@ class BroadcastifyArchive:
     def build(self, start=None, end=None, days_back=0, chronological=False,
               rebuild=False):
         """
-        Build the archive entry data for the given archive specified by the
-        BroadcastifyArchive's feed_id. The major steps include:
-            - Navigate to the feed's archive page
-            - Scrape the archiveTimes Table (ATT) for each day in the date range
-            - Populate the archive entry dictionary for all retrieved data
-              (stored in the .entries attribute)
+        Build archive entry data for the BroadcastifyArchive's feed_id and
+        populate as a dictionary to the .entries attribute.
 
         Parameters
         ----------
             start : datetime.date
-                The earliest date & time for which to populate the archive
+                The earliest date for which to populate the archive
             end : datetime.date
-                The earliest date & time for which to populate the archive
+                The earliest date for which to populate the archive
             days_back : int
                 The number of days before the current day to retrieve informa-
                 tion for. A value of `0` retrieves only archive entries corres-
@@ -390,28 +404,6 @@ class BroadcastifyArchive:
             except:
                 raise TypeError(f'`days_back` must be a non-negative integer.')
 
-        # ## If `start` or `end` was passed with a time component, strip it out
-        # ## and warn the user.
-        # if any([isinstance(start, _datetime),
-        #        isinstance(end, _datetime)]):
-        #        _warnings.warn(f'A date parameter was passed as a datetime but '
-        #                       f'will be interpreted as a date during archive '
-        #                       f'build. All archive entries for the date(s) in '
-        #                       f'question will be included.')
-        #
-        # ## `start` and `end` must be dates
-        # try:
-        #     if start:
-        #         start = start.date()
-        #     if end:
-        #         end = end.date()
-        # except(AttributeError):
-        #     raise AttributeError(f'Could not interpret a date parameter as a date.')
-
-        ## `start` cannot be > `end`
-        if start > end:
-            raise AttributeError(f'`start` date cannot be after `end` date.')
-
         # Build the list of dates to scrape
         ## If we're using start & end dates (not days back)...
         if not days_back:
@@ -428,10 +420,14 @@ class BroadcastifyArchive:
             # Get the size of the date range
             days_back = (end - start).days
 
+        ## `start` cannot be > `end`
+        if start > end:
+            raise AttributeError(f'`start` date cannot be after `end` date.')
+
         # Adjust for the exclusive end of range()
         days_back += 1
 
-        date_list = sorted([end - _timedelta(days=x) for x in range(days_back)],
+        date_list = sorted([end - _dt.timedelta(days=x) for x in range(days_back)],
                            reverse=not(chronological))
 
         archive_entries = []
@@ -484,19 +480,25 @@ class BroadcastifyArchive:
         start       : datetime.datetime
             The earliest date & time for which to download files
         end         : datetime.datetime
-            The earliest date & time for which to retrieve files
+            The latest date & time for which to retrieve files
         all_entries : boolean
             Download all available archive files
 
-          ** Behavior
-          -----------
-            -> `start` omitted & `end` given: retrieve from the earliest archive
-                file through the file covering `end`
-            -> `start` given & `end` omitted: retrieve from the archive file
-                containing `start` through the last archive file
-            -> `all_entries`=True: retrieve all files; ignore other arguments
-            ->  If `start` & `end` are omitted and `all_entries` is False, an
-                error will be raised.
+          Behavior
+          --------
+            Omit   `start` ---------> retrieve from the earliest archive
+            Supply `end`              file through the file covering `end`
+
+            Supply `start` ---------> retrieve from the archive file
+            Omit   `end`              containing `start` through the last archive
+                                      file
+
+            `all_entries` is True --> retrieve all files; ignore other arguments
+
+            `all_entries` is False -> raise an error
+            Omit `start`
+            Omit `end`
+
 
         output_path : str (optional)
             The local path to which archive entry mp3 files will be written. The
@@ -506,30 +508,30 @@ class BroadcastifyArchive:
 
         # Make sure arguments were passed in a valid combination
         if not all_entries:
-            if all(not(start), not(end)):
+            if all([not(start), not(end)]):
                 raise ValueError(f'One of `start`, `end`, or `dates` must be'
                                    f'supplied.')
 
         # Make sure everything is a datetime
-        if not all(isinstance(start, _datetime), isinstance(end, _datetime)):
+        if not all([isinstance(start, _dt.datetime), isinstance(end, _dt.datetime)]):
             raise TypeError(f'`start` and `end` must be of type `datetime`.')
 
         # Build the list of download dates; store in filtered_entries
         if all_entries:
             filtered_entries = self.entries
         else:
-            filter_start = datetime.combine(self.earliest_entry,
-                                            datetime(1,1,1,0,0).time())
+            filter_start = _dt.datetime.combine(self.earliest_entry,
+                                            _dt.datetime(1,1,1,0,0).time())
 
-            filter_end = datetime.combine(self.latest_entry,
-                                          datetime(1,1,1,0,0).time())
+            filter_end = _dt.datetime.combine(self.latest_entry,
+                                          _dt.datetime(1,1,1,0,0).time())
 
             if start:
                 filter_start = start
             if end:
                 filter_end = end
 
-            filtered_entries = [entry for entry in entries if
+            filtered_entries = [entry for entry in self.entries if
                                 entry['start_time'] >= filter_start and
                                 entry['end_time'] <= filter_end]
 
@@ -540,7 +542,7 @@ class BroadcastifyArchive:
                                 verbose=self._verbose)
 
         if self._verbose:
-            print(f'\n{len(filtered_entries)} archive entries matched.')
+            print(f'{{':,'}len(filtered_entries)} archive entries matched.')
 
         # Pass them to _DownloadNavigator to get the files
         dn.get_archive_mp3s(filtered_entries, output_path)
@@ -590,24 +592,24 @@ class BroadcastifyArchive:
         date = self._an.active_date
 
         # Get time objects from the HH:MM AM/PM text
-        hhmm_start, hhmm_end = [_datetime.strptime(each, '%I:%M %p').time()
+        hhmm_start, hhmm_end = [ _dt.datetime.strptime(each, '%I:%M %p').time()
                                 for each in time]
 
         # Set the end time
-        end = _datetime.combine(date, hhmm_end)
+        end = _dt.datetime.combine(date, hhmm_end)
 
         # If the start time is bigger than the end time, the archive starts on
         # the previous day
         if hhmm_start > hhmm_end:
-            date -= _timedelta(days=1)
-            start = _datetime.combine(date, hhmm_start)
+            date -= _dt.timedelta(days=1)
+            start = _dt.datetime.combine(date, hhmm_start)
         else:
-            start = _datetime.combine(date, hhmm_start)
+            start = _dt.datetime.combine(date, hhmm_start)
 
         return (start, end)
 
     def __repr__(self):
-        return(f'BroadcastifyArchive\n'
+        repr = f'BroadcastifyArchive\n'
                f' (Feed ID = {self.feed_id}\n'
                f'  Feed Name = {self.feed_name}\n'
                f'  Feed URL = "{self.feed_url}"\n'
@@ -615,10 +617,14 @@ class BroadcastifyArchive:
                f'  Start Date: {str(self.start_date)}\n'
                f'  End Date:   {str(self.end_date)}\n'
                f'  Username = "{self.username}" Password = [{self.password}]\n'
-               f'  {len(self.entries)} parsed archive entries '
-               f'between {self.earliest_entry} and {self.latest_entry}\n'
-               f'  Verbose = {self._verbose}'
-               f')')
+               f'  {'{:,}'.format(len(self.entries)} parsed archive entries '
+
+        if not (self.earliest_entry and self.latest_entry):
+            repr += f'between {self.earliest_entry} and {self.latest_entry}'
+
+        repr += f'\n  Verbose = {self._verbose})'
+
+        return repr
 
 #-----------------------------------------------------------------------------
 # _ArchiveNavigator
@@ -650,6 +656,7 @@ class _ArchiveNavigator:
 
         self.current_first_uri = None
         self.no_att_data = False
+        self.page_last_updated = None
 
         self.throttle = _RequestThrottle()
 
@@ -662,23 +669,6 @@ class _ArchiveNavigator:
         self.archive_end_date = self.active_date
 
         self.archive_start_date = self.month_min_date
-
-    # @property
-    # def att_soup(self):
-    #     if isinstance(self._att_soup, bs4.element.Tag):
-    #         print(self._att_soup.find('tr').find('a').attrs['href'])
-    #         return self._att_soup
-    #     else:
-    #         return self._att_soup
-    # @att_soup.setter
-    # def att_soup(self, value):
-    #     self._att_soup = value
-    #     print('att_soup updated!')
-    #     # if isinstance(self._att_soup, bs4.element.Tag): ####
-    #     #     try:
-    #     #         print(self._att_soup.find('tr').find('a').attrs['href'])
-    #     #     except(AttributeError):
-    #     #         print('No entries found.')
 
     def get_archive_start(self):
         if self.verbose:
@@ -751,7 +741,8 @@ class _ArchiveNavigator:
             except:
                 self.browser.find_element_by_xpath(f"//td[@class='active day' "
                                         f"and contains(text(), '{new_day}')]").click()
-
+            finally:
+                self._set_last_page_update()
 
             if date != self.active_date:
                 self.__scrape_nav_page()
@@ -770,6 +761,19 @@ class _ArchiveNavigator:
                   _EC.presence_of_element_located((_By.CLASS_NAME,
                                                    "cursor-link")))
 
+        # Set up MutationObserver to handle consecutive dates with no data
+        self.browser.execute_script(
+            """
+              new MutationObserver(() => {
+                window.lastRefresh = new Date()
+              }).observe(document.querySelector("table.table.table-striped.table-bordered.hover.dataTable.no-footer"), {
+              attributes: true, childList: true, subtree: true } )
+            """
+            )
+
+        # Get the timestamp of the last page updated
+        self._set_last_page_update()
+
     def __scrape_nav_page(self, wait=True):
         self.__check_browser()
 
@@ -781,9 +785,8 @@ class _ArchiveNavigator:
                                     _By.XPATH, _first_uri_in_att_xpath),
                                     self.current_first_uri))
             else:
-                    element = _WebDriverWait(self.browser, 10).until_not(
-                                _EC.presence_of_element_located((
-                                    _By.CLASS_NAME, "dataTables_empty")))
+                element = _WebDriverWait(self.browser, 10).until_not(
+                                _att_to_be_updated((self)))
 
         # Scrape page content
         soup = _BeautifulSoup(self.browser.page_source, 'lxml')
@@ -850,15 +853,15 @@ class _ArchiveNavigator:
         # If the active day is on the displayed month, reset the attribute;
         # otherwise, leave it alone.
         if active_day:
-            self.active_date = _date(displayed_year,
+            self.active_date = _dt.date(displayed_year,
                                     displayed_month,
                                     active_day)
 
-        self.month_min_date = _date(displayed_year,
+        self.month_min_date = _dt.date(displayed_year,
                                    displayed_month,
                                    month_min_day)
 
-        self.month_max_date = _date(displayed_year,
+        self.month_max_date = _dt.date(displayed_year,
                                    displayed_month,
                                    month_max_day)
 
@@ -884,6 +887,19 @@ class _ArchiveNavigator:
         except _NSEE:
             self.no_att_data = True
             return _NO_ATT_DATA
+
+    def _set_last_page_update(self):
+        # Get the last update from the browser; may be None
+        last_update = self.browser.execute_script('return window.lastRefresh')
+
+        if last_update:
+            # Convert to a datetime
+            last_update = _dt.datetime.strptime(last_update,
+                                             '%Y-%m-%dT%H:%M:%S.%fZ')
+
+        self.page_last_updated = last_update
+
+        return last_update
 
     def open_browser(self):
         if self.verbose: print('\tOpening browser...')
