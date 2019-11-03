@@ -9,7 +9,7 @@
 #-----------------------------------------------------------------------------
 #
 # The _B_roadcastify _AR_chive _T_oolkit
-# v1.0
+# v1.0-beta
 #
 #   |\/\/\/|  +------------------------+
 #   |      |  | Eat my shortwave, man. |
@@ -31,6 +31,12 @@
 
 
 #-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#
+#
+#
 # Imports
 #-----------------------------------------------------------------------------
 import errno as _errno
@@ -53,9 +59,20 @@ from selenium.webdriver.support.ui import WebDriverWait as _WebDriverWait
 from selenium.webdriver.support import expected_conditions as _EC
 from selenium.webdriver.common.by import By as _By
 from selenium.webdriver.chrome.options import Options as _Options
-from selenium.common.exceptions import NoSuchElementException as _NSEE
+from selenium.common.exceptions import NoSuchElementException as _NSEE, \
+                                       ElementNotInteractableException as _ENI
+
+
+
+
 
 #-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#
+#
+#
 # Constants & Configs
 #-----------------------------------------------------------------------------
 _CONFIG_FILENAME = 'config.ini'
@@ -87,14 +104,19 @@ _FILE_REQUEST_WAIT = _config.getfloat('throttle_times',
 _PAGE_REQUEST_WAIT = _config.getfloat('throttle_times',
                                       'PAGE_REQUEST_WAIT',
                                       fallback=2)
+_DATE_NAV_WAIT = _config.getfloat('throttle_times',
+                                      'DATE_NAV_WAIT',
+                                      fallback=0.1)
 
-# Selenium config
+# Selenium
 _WEBDRIVER_PATH = _config.get('selenium_config',
                               'WEBDRIVER_PATH',
                               fallback=None)
 
 if _WEBDRIVER_PATH == '':
     _WEBDRIVER_PATH = None
+
+_FIRST_URI_IN_ATT_XPATH = "//a[contains(@href,'/archives/download/')]"
 
 # Output path
 _MP3_OUT_PATH = _config['output_path']['MP3_OUT_PATH']
@@ -103,13 +125,16 @@ _MP3_OUT_PATH = _config['output_path']['MP3_OUT_PATH']
 _AUTH_DATA_PATH = _config['authentication_path']['AUTH_DATA_PATH']
 
 
-#-----------------------------------------------------------------------------
-# Variables
-#-----------------------------------------------------------------------------
-_first_uri_in_att_xpath = "//a[contains(@href,'/archives/download/')]"
+
 
 
 #-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#
+#
+#
 # Functions
 #-----------------------------------------------------------------------------
 def _login_credentials_present(username, password):
@@ -133,85 +158,28 @@ def _get_feed_name(feed_id):
 def _diff_month(d1, d2):
     return (d2.year - d1.year) * 12 + d2.month - d1.month
 
+
+
+
 #-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#
+#
+#
 # CLASSES
 #-----------------------------------------------------------------------------
 
-#-----------------------------------------------------------------------------
-# _text_to_be_present_in_href
-#-----------------------------------------------------------------------------
-class _text_to_be_present_in_href(object):
-    """
-    A CUSTOM Selenium expectation for checking if the given text is present in
-    the element's locator, href attribute
-    """
-    def __init__(self, locator, text_):
-        self.locator = locator
-        self.text = text_
 
-    def __call__(self, driver):
-        try:
-            element_text = _EC._find_element(driver,
-                                         self.locator).get_attribute('href')
-            if element_text:
-                return self.text in element_text
-            else:
-                return False
-        except:
-            return False
+
+
 
 #-----------------------------------------------------------------------------
-# _att_to_be_updated
 #-----------------------------------------------------------------------------
-class _att_to_be_updated(object):
-    """
-    A CUSTOM Selenium expectation for checking whether the ArchiveTimesTable has
-    been updated.
-    """
-    def __init__(self, archive_navigator):
-        self.an = archive_navigator
-        self.page_last_updated = self.an.page_last_updated
-
-    def __call__(self, driver):
-        try:
-            return self.page_last_updated != self.an._set_last_page_update()
-        except:
-            return False
-
-#-----------------------------------------------------------------------------
-# _NavigatorException
-#-----------------------------------------------------------------------------
-class _NavigatorException(Exception):
-    pass
-
-#-----------------------------------------------------------------------------
-# _RequestThrottle
-#-----------------------------------------------------------------------------
-class _RequestThrottle:
-    """
-    Limits the pace with which requests are sent to Broadcastify's servers
-    """
-    def __init__(self):
-        self.last_file_req = _timer()
-        self.last_page_req = _timer()
-
-    def throttle(self, type='page', wait=None):
-        if wait:
-            start = _timer()
-            while not _timer() - start >= wait:
-                pass
-            return None
-
-        if type == 'page':
-            while not _timer() - self.last_page_req >= _PAGE_REQUEST_WAIT:
-                pass
-            self.last_page_req = _timer()
-        else:
-            while not _timer() - self.last_file_req >= _FILE_REQUEST_WAIT:
-                pass
-            self.last_file_req = _timer()
-
-#-----------------------------------------------------------------------------
+#
+#
+#
 # BroadcastifyArchive
 #-----------------------------------------------------------------------------
 class BroadcastifyArchive:
@@ -287,6 +255,7 @@ class BroadcastifyArchive:
         self.start_date = None
         self.end_date = None
         self.show_browser_ui = show_browser_ui
+        self.throttle = _RequestThrottle()
 
         self._verbose = verbose
 
@@ -311,56 +280,29 @@ class BroadcastifyArchive:
         if self._password == '':
             self.password = None
 
-        # Instantiate the _ArchiveNavigator
+        # Initialize calendar navigation
         if self._verbose:
-            print(f'Initializing archive navigation...')
+            print(f'Initializing calendar navigation...')
 
-        self._an = _ArchiveNavigator(self.archive_url,
-                                    self._verbose,
-                                    show_browser_ui=self.show_browser_ui)
+        # Set whether to show browser UI while fetching
+        options = _Options()
+        if not self.show_browser_ui:
+            options.add_argument('--headless')
+            options.add_argument('--disable-gpu')
 
-        self._an.get_archive_start()
+        # Launch Chrome
+        with _webdriver.Chrome(chrome_options=options) as browser:
+            browser.get(self.archive_url)
+            self.archive_calendar = ArchiveCalendar(self, browser,
+                                                    get_dates=True)
+            self.start_date = self.archive_calendar.start_date
+            self.end_date = self.archive_calendar.end_date
 
-        self.start_date = self._an.archive_start_date
-        self.end_date = self._an.archive_end_date
+        self.archive_calendar = None
 
         if self._verbose:
             print('Initialization complete.\n')
             print(self)
-
-    @property
-    def feed_id(self):
-        """
-        Unique ID for the Broadcastify feed. Taken from
-        https://www.broadcastify.com/listen/feed/[feed_id]
-        """
-        return self._feed_id
-    @feed_id.setter
-    def feed_id(self, value):
-        self._feed_id = value
-        self.feed_name = _get_feed_name(value)
-        self.start_date = None
-        self.end_date = None
-        self.entries = []
-        self.earliest_entry = None
-        self.latest_entry = None
-        self.feed_url = _FEED_URL_STEM + value
-        self.archive_url = _ARCHIVE_FEED_STEM + value
-        self._an = None
-
-    @property
-    def password(self):
-        """
-        Password for Broadcastify premium account. Getting the property
-        will return a Boolean indicating whether the password has been set.
-        """
-        if self._password:
-            return True
-        else:
-            return False
-    @password.setter
-    def password(self, value):
-        self._password = value
 
     def build(self, start=None, end=None, days_back=0, chronological=False,
               rebuild=False):
@@ -407,23 +349,40 @@ class BroadcastifyArchive:
 
         # Build the list of dates to scrape
         ## If we're using start & end dates (not days back)...
+        out_of_range = ''
+
         if not days_back:
-            # Bookend `start` and `end` with the archive's start & end dates
+            # Check that `start` and `end` within archive's start & end dates
             if start:
-                start = max(start, self.start_date)
+                if start < self.start_date:
+                    out_of_range = (f'start date out of archive range: '
+                                    f'{start} < {self.start_date}\n')
+                elif start > self.end_date:
+                    out_of_range = (f'start date out of archive range: '
+                                    f'{start} > {self.end_date}\n')
             else:
                 start = self.start_date
+
             if end:
-                end = min(end, self.end_date)
+                if end > self.end_date:
+                    out_of_range += (f'end date out of archive range: '
+                                     f'{end} > {self.end_date}')
+                elif end < self.start_date:
+                    out_of_range += (f'end date out of archive range: '
+                                     f'{end} < {self.start_date}')
             else:
                 end = self.end_date
+
+            if out_of_range:
+                raise AttributeError(out_of_range)
 
             # Get the size of the date range
             days_back = (end - start).days
 
         ## `start` cannot be > `end`
         if start > end:
-            raise AttributeError(f'`start` date cannot be after `end` date.')
+            raise AttributeError(f'`start` date ({start}) cannot be after `end` '
+                                 f'date ({end}).')
 
         # Adjust for the exclusive end of range()
         days_back += 1
@@ -433,18 +392,28 @@ class BroadcastifyArchive:
 
         archive_entries = []
 
-        # Navigate to, scrape, and parse archive entries for each date in list
+        # Spin up a browser and an ArchiveCalendar
+        # Set whether to show browser UI while fetching
+        options = _Options()
+        if not self.show_browser_ui:
+            options.add_argument('--headless')
+            options.add_argument('--disable-gpu')
+
+        # with _webdriver.Chrome(chrome_options=options) as browser:
+        browser = _webdriver.Chrome(chrome_options=options)
+        browser.get(self.archive_url)
+        self.arch_cal = ArchiveCalendar(self, browser)
+
+        # Get archive entries for each date in list
         for i, date in enumerate(date_list):
-            _clear_output(wait=True)
+            ####_clear_output(wait=True)
             if self._verbose: print(f'Parsing archive entry for {date} '
                                     f'({i + 1} of {len(date_list)})')
 
-            self._an.navigate_to_date(date)
+            self.arch_cal.go_to_date(date)
 
-            if not(self._an.no_att_data):
-                archive_entries.extend(self.__parse_att(self._an.att_soup))
-
-        self._an.close_browser()
+            if self.arch_cal.entries_for_date:
+                archive_entries.extend(self.arch_cal.entries_for_date)
 
         if self._verbose: print('Processing archive entries...')
 
@@ -454,15 +423,14 @@ class BroadcastifyArchive:
         # Store URIs and end times in the entries attritbute
         for entry in archive_entries:
             entry_dict = {
-                'feed_id': self.feed_id,
                 'uri': entry[0],
-                'end_time': entry[2],
-                'start_time': entry[1]
+                'start_time': entry[1],
+                'end_time': entry[2]
             }
 
             self.entries.append(entry_dict)
 
-        _clear_output(wait=True)
+        ####_clear_output(wait=True)
 
         self.earliest_entry = max(self.start_date, start)
         self.latest_entry = min(self.end_date, end)
@@ -478,9 +446,9 @@ class BroadcastifyArchive:
 
         Parameters
         ----------
-        start       : datetime.datetime
+        start : datetime.datetime
             The earliest date & time for which to download files
-        end         : datetime.datetime
+        end : datetime.datetime
             The latest date & time for which to retrieve files
         all_entries : boolean
             Download all available archive files
@@ -494,19 +462,18 @@ class BroadcastifyArchive:
             Omit   `end`              containing `start` through the last archive
                                       file
 
-            `all_entries` is True --> retrieve all files; ignore other arguments
+           `all_entries` is True --> retrieve all files; ignore other arguments
 
-            `all_entries` is False -> raise an error
+           `all_entries` is False -> raise an error
             Omit `start`
             Omit `end`
-
+          --------
 
         output_path : str (optional)
             The local path to which archive entry mp3 files will be written. The
             path must exist before calling the method. Defaults to the value
-            supplied in config.ini's _MP3_OUT_PATH.
+            supplied in config.ini -> _MP3_OUT_PATH.
         """
-
         # Make sure arguments were passed in a valid combination
         if not all_entries:
             if all([not(start), not(end)]):
@@ -537,10 +504,8 @@ class BroadcastifyArchive:
                                 entry['end_time'] <= filter_end]
 
         # Retrieve the file URIs
-        dn = _DownloadNavigator(login=True,
-                                username=self.username,
-                                password=self._password,
-                                verbose=self._verbose)
+        dn = ArchiveDownloader(self, login=True, username=self.username,
+                               password=self._password, verbose=self._verbose)
 
         if self._verbose:
             print(f'{len(filtered_entries)} archive entries matched.')
@@ -548,66 +513,39 @@ class BroadcastifyArchive:
         # Pass them to _DownloadNavigator to get the files
         dn.get_archive_mp3s(filtered_entries, output_path)
 
-    def __parse_att(self, att_soup):
+    @property
+    def feed_id(self):
         """
-        Generates Broadcastify archive file information from the `archiveTimes`
-        table ("ATT") on a feed's archive page. Returns a list of lists
-        containing three elements:
-            - The URI for the file, which can be used to find the file's
-              individual download page
-            - Start and end date/time of the transmission as datetime objects
-
-        Parameters
-        ----------
-        att_soup : bs4.BeautifulSoup
-            A BeautifulSoup object containing the ATT source code, obtained
-            from _ArchiveNavigator.att_soup
+        Unique ID for the Broadcastify feed. Taken from
+        https://www.broadcastify.com/listen/feed/[feed_id]
         """
+        return self._feed_id
+    @feed_id.setter
+    def feed_id(self, value):
+        self._feed_id = value
+        self.feed_name = _get_feed_name(value)
+        self.start_date = None
+        self.end_date = None
+        self.entries = []
+        self.earliest_entry = None
+        self.latest_entry = None
+        self.feed_url = _FEED_URL_STEM + value
+        self.archive_url = _ARCHIVE_FEED_STEM + value
+        self._an = None
 
-        # Set up a blank list to return
-        att_entries = []
-
-        # Loop through all rows of the table
-        for row in att_soup.find_all('tr'):
-            # Grab the start & end times from the row's <td> tags
-            file_start, file_end = self.__get_entry_datetime(
-                                    [(each.text) for each
-                                     in row.find_all('td')])
-
-            # Grab the file ID
-            file_uri = row.find('a')['href'].split('/')[-1]
-
-            # Put the file date/time and URL leaf (as a list) into the list
-            att_entries.append([file_uri,
-                                file_start,
-                                file_end])
-
-        return att_entries
-
-    def __get_entry_datetime(self, time):
+    @property
+    def password(self):
         """
-        Convert the archive entry start & end times from a list of strings
-        to a tuple of datetimes
+        Password for Broadcastify premium account. Getting the property
+        will return a Boolean indicating whether the password has been set.
         """
-        # Set date component to the date currently displayed
-        date = self._an.active_date
-
-        # Get time objects from the HH:MM AM/PM text
-        hhmm_start, hhmm_end = [ _dt.datetime.strptime(each, '%I:%M %p').time()
-                                for each in time]
-
-        # Set the end time
-        end = _dt.datetime.combine(date, hhmm_end)
-
-        # If the start time is bigger than the end time, the archive starts on
-        # the previous day
-        if hhmm_start > hhmm_end:
-            date -= _dt.timedelta(days=1)
-            start = _dt.datetime.combine(date, hhmm_start)
+        if self._password:
+            return True
         else:
-            start = _dt.datetime.combine(date, hhmm_start)
-
-        return (start, end)
+            return False
+    @password.setter
+    def password(self, value):
+        self._password = value
 
     def __repr__(self):
         repr = f'BroadcastifyArchive\n' + \
@@ -620,7 +558,7 @@ class BroadcastifyArchive:
                f'  Username = "{self.username}" Password = [{self.password}]\n' + \
                f"  {'{:,}'.format(len(self.entries))} parsed archive entries "
 
-        if not (self.earliest_entry and self.latest_entry):
+        if not(self.earliest_entry is None and self.latest_entry is None):
             repr += f'between {self.earliest_entry} and {self.latest_entry}'
 
         repr += f'\n  Verbose = {self._verbose})'
@@ -628,313 +566,17 @@ class BroadcastifyArchive:
         return repr
 
 #-----------------------------------------------------------------------------
-# _ArchiveNavigator
 #-----------------------------------------------------------------------------
-class _ArchiveNavigator:
-    def __init__(self, url, verbose, show_browser_ui=False):
-        """
-        Utility for navigating the archive feed.
-
-        Parameters
-        ----------
-        url : str
-            Full https URL for the feed's archive page.
-        verbose : bool
-            If True, the system will generate more verbose output during longer
-            operations.
-        """
-
-        self.url = url
-        self.calendar_soup = None
-        self.att_soup = None
-        self.browser = None
-        self.show_browser_ui = show_browser_ui
-        self.verbose = verbose
-
-        self.active_date = None # currently displayed date
-        self.month_max_date = None # latest day w/ entries in displayed month
-        self.month_min_date = None # earliest day w/ entries in displayed month
-
-        self.current_first_uri = None
-        self.no_att_data = False
-        self.page_last_updated = None
-
-        self.throttle = _RequestThrottle()
-
-        # Get initial page scrape & parse the calendar
-        self.open_browser()
-        self.__load_nav_page()
-        self.__scrape_nav_page(wait=False)
-        self.__parse_calendar()
-
-        self.archive_end_date = self.active_date
-
-        self.archive_start_date = self.month_min_date
-
-    def get_archive_start(self):
-        if self.verbose:
-            print(f'\tLooking for archive start date...')
-
-        prev_button = self.calendar_soup.find('th',
-                                    attrs={'class': 'prev',
-                                           'style': 'visibility: visible;'})
-
-        while prev_button:
-            # Click to go to the prior month
-            self.__check_browser()
-            self.throttle.throttle()
-            self.browser.find_element_by_class_name('prev').click()
-
-            # Scrape and parse the new month
-            self.__scrape_nav_page(wait=False)
-            self.__parse_calendar()
-
-            # Set the archive_start_date to the earliest valid day in the
-            # displayed month
-            self.archive_start_date = self.month_min_date
-
-            # Get the button to display the previous month; if there isn't one,
-            # we're done and the loop will terminate
-            prev_button = self.calendar_soup.find('th',
-                                        attrs={'class': 'prev',
-                                               'style': 'visibility: visible;'})
-
-        if self.verbose:
-            print(f'\tFound start date at {self.archive_start_date}.')
-
-        self.navigate_to_date(date=self.archive_end_date,
-                              from_date=self.archive_start_date,
-                              navigate_only=True)
-
-    def navigate_to_date(self, date, from_date=None, navigate_only=False):
-        # Check that the date is valid (between start & end dates)
-        if not (self.archive_start_date <= date <= self.archive_end_date):
-            raise ValueError(
-                    '`date` argument must be between start and end dates')
-        # Set blank from dates to the active_day
-        if not from_date:
-            from_date = self.active_date
-
-        # Get the day
-        new_day = date.day
-
-        # Traverse the months, if necessary
-        months_to_traverse = _diff_month(from_date, date)
-        if months_to_traverse >= 0:
-            step_direction = 1
-            button_name = 'next'
-        else:
-            step_direction = -1
-            button_name = 'prev'
-        for _ in range(0, months_to_traverse, step_direction):
-            self.__check_browser()
-            self.throttle.throttle(wait=0.1)
-            self.browser.find_element_by_class_name(button_name).click()
-
-        # Click the date, if appropriate
-        if not(navigate_only):
-            self.__check_browser()
-            self.throttle.throttle()
-
-            try:
-                self.browser.find_element_by_xpath(f"//td[@class='day' "
-                                        f"and contains(text(), '{new_day}')]").click()
-            except:
-                self.browser.find_element_by_xpath(f"//td[@class='active day' "
-                                        f"and contains(text(), '{new_day}')]").click()
-            finally:
-                self._set_last_page_update()
-
-            if date != self.active_date:
-                self.__scrape_nav_page()
-                self.__parse_calendar()
-
-
-    def __load_nav_page(self):
-        if self.verbose: print('\tLoading navigation page...')
-        self.__check_browser()
-
-        # Browse to feed archive page
-        self.browser.get(self.url)
-
-        # Wait for page to render
-        element = _WebDriverWait(self.browser, 10).until(
-                  _EC.presence_of_element_located((_By.CLASS_NAME,
-                                                   "cursor-link")))
-
-        # Set up MutationObserver to handle consecutive dates with no data
-        self.browser.execute_script(
-            """
-              new MutationObserver(() => {
-                window.lastRefresh = new Date()
-              }).observe(document.querySelector("table.table.table-striped.table-bordered.hover.dataTable.no-footer"), {
-              attributes: true, childList: true, subtree: true } )
-            """
-            )
-
-        # Get the timestamp of the last page updated
-        self._set_last_page_update()
-
-    def __scrape_nav_page(self, wait=True):
-        self.__check_browser()
-
-        # Wait for page to render
-        if wait and self.current_first_uri:
-            if self.current_first_uri != _NO_ATT_DATA:
-                element = _WebDriverWait(self.browser, 10).until_not(
-                                _text_to_be_present_in_href((
-                                    _By.XPATH, _first_uri_in_att_xpath),
-                                    self.current_first_uri))
-            else:
-                element = _WebDriverWait(self.browser, 10).until_not(
-                                _att_to_be_updated((self)))
-
-        # Scrape page content
-        soup = _BeautifulSoup(self.browser.page_source, 'lxml')
-
-        # Isolate the calendar and the archiveTimes table
-        self.calendar_soup = soup.find('table',
-                                       {'class': 'table-condensed'})
-        self.att_soup = soup.find('table',
-                                  attrs={'id': 'archiveTimes'}
-                                  ).find('tbody')
-
-        self.current_first_uri = self.__get_current_first_uri()
-
-
-    def __parse_calendar(self):
-        """
-        Uses a bs4 ResultSet of the <td> tags representing days currently dis-
-        played on the calendar to set calendarattributes. Items have the format
-        of `<td class="[class]">[D]</td>` where
-         - [D] is the one- or two-digit day (as a string) and
-         - [class] is one of
-             "old day"          = a day with archives but in a prior month
-                                  (clicking will refresh the calendar)
-             "day"              = a past day in the current month
-             "active day"       = the day currently displayed in the ATT
-             "disabled day"     = a day for which no archive is available in a
-                                  month (past or future) that has other days
-                                  with archives. For example, if today is July
-                                  27, July 28-31 will be disabled days, as will
-                                  January 1-26 (since the archive goes back only
-                                  180 days). December 31 would be an "old dis-
-                                  abled day".
-             "new disabled day" = a day in a future month
-             "old disabled day" = see explanation in "disabled day"
-
-
-        """
-
-        # Get the tags representing the days currently displayed on the calendar
-        days_on_calendar = self.calendar_soup.find_all('td')
-
-        # Get the month & year currently displayed
-        month, year = self.calendar_soup.find('th',
-                                              {'class': 'datepicker-switch'}
-                                              ).text.split(' ')
-
-        displayed_month = _MONTHS.index(month)
-        displayed_year = int(year)
-
-        # Parse the various calendar attributes
-        try:
-            active_day = int([day.text for day in days_on_calendar
-                               if (day['class'][0] == 'active')][0])
-        except:
-            active_day = None
-
-        month_max_day = int([day.text for day in days_on_calendar
-                              if (day['class'][0] == 'day') or
-                                 (day['class'][0] == 'active')][::-1][0])
-
-        month_min_day = int(self.__parse_month_min_day(days_on_calendar))
-
-        # Set class attributes
-        # If the active day is on the displayed month, reset the attribute;
-        # otherwise, leave it alone.
-        if active_day:
-            self.active_date = _dt.date(displayed_year,
-                                    displayed_month,
-                                    active_day)
-
-        self.month_min_date = _dt.date(displayed_year,
-                                   displayed_month,
-                                   month_min_day)
-
-        self.month_max_date = _dt.date(displayed_year,
-                                   displayed_month,
-                                   month_max_day)
-
-    def __parse_month_min_day(self, days_on_calendar):
-        """Parse the lowest valid day in the displayed month"""
-        disabled_found = False
-        for day in days_on_calendar:
-            if day['class'][0] == 'disabled':
-                disabled_found = True
-            elif day['class'][0] in 'day active'.split():
-                return day.text
-            elif day['class'][0] != 'old' and disabled_found:
-                return day.text
-
-        return None
-
-    def __get_current_first_uri(self):
-        try:
-            uri = self.browser.find_element_by_xpath(_first_uri_in_att_xpath
-                    ).get_attribute('href').split('/')[-1]
-            self.no_att_data = False
-            return uri
-        except _NSEE:
-            self.no_att_data = True
-            return _NO_ATT_DATA
-
-    def _set_last_page_update(self):
-        # Get the last update from the browser; may be None
-        last_update = self.browser.execute_script('return window.lastRefresh')
-
-        if last_update:
-            # Convert to a datetime
-            last_update = _dt.datetime.strptime(last_update,
-                                             '%Y-%m-%dT%H:%M:%S.%fZ')
-
-        self.page_last_updated = last_update
-
-        return last_update
-
-    def open_browser(self):
-        if self.verbose: print('\tOpening browser...')
-
-        # Set whether to show browser UI while fetching
-        options = _Options()
-        if not self.show_browser_ui:
-            options.add_argument('--headless')
-            options.add_argument('--disable-gpu')
-
-        # Launch Chrome
-        self.browser = _webdriver.Chrome(chrome_options=options)
-
-    def close_browser(self):
-        if self.verbose: print('Closing browser...')
-        self.browser.quit()
-
-    def __check_browser(self):
-        if not self.browser:
-            raise _NavigatorException(f"Please open a browser. And do please "
-                                      f"remember to close it when you're done.")
-
-    def __repr__(self):
-        return(f'_ArchiveNavigator(URL: {self.url}, '
-               f'Currently Displayed: {str(self.active_date)}, '
-               f'Start Date:\t{str(self.archive_start_date)}, '
-               f'End Date:\t{str(self.archive_end_date)}')
-
+#
+#
+#
+# ArchiveDownloader
 #-----------------------------------------------------------------------------
-# _DownloadNavigator
-#-----------------------------------------------------------------------------
-class _DownloadNavigator:
-    def __init__(self, login=False, username=None, password=None,
+class ArchiveDownloader:
+    def __init__(self, parent, login=False, username=None, password=None,
                  verbose=False):
+        self._parent = parent
+
         self.download_page_soup = None
         self.current_archive_id = None
         self.verbose = verbose
@@ -960,7 +602,7 @@ class _DownloadNavigator:
 
             _login_credentials_present(username, password)
 
-            t.throttle()
+            t.throttle('file')
             r = s.post(_LOGIN_URL, data=login_data, headers=headers)
 
             if r.status_code != 200:
@@ -985,7 +627,7 @@ class _DownloadNavigator:
         start = _timer()
 
         for file in archive_entries:
-            feed_id =  file['feed_id']
+            feed_id =  self._parent.feed_id
             archive_uri = file['uri']
             file_date = self.__format_entry_date(file['end_time'])
 
@@ -1049,3 +691,480 @@ class _DownloadNavigator:
     def __repr__(self):
         return(f'_DownloadNavigator(Current Archive: '
                f'{self.current_archive_id})')
+
+#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#
+#
+#
+# ArchiveCalendar
+#-----------------------------------------------------------------------------
+class ArchiveCalendar:
+    def __init__(self, parent, browser, get_dates=False):
+        self.parent = parent
+        self._browser = browser
+
+        ## Wait for calendar to load on navigation page
+        element = _WebDriverWait(self._browser, 10).until(
+                                 _EC.presence_of_element_located((
+                                 _By.CLASS_NAME, 'datepicker-switch')))
+
+        # Initialize object attributes
+        self._scrape_contents()        # Initializes _contents
+        self._parse_calendar_attrs()   # Initializes _calendar, displayed_month,
+                                       # & active_date
+        if get_dates:
+            self.end_date = self.active_date
+            self._get_start_date()     # Initializes start_date
+        else:
+            self.end_date = self.parent.end_date
+            self.start_date = self.parent.start_date
+
+        self._att = ArchiveTimesTable(self, browser)
+
+    def update(self):
+        self._wait_for_refresh()
+        self._scrape_contents()
+        self._parse_calendar_attrs()
+
+    def go_to_date(self, date):
+        ### Navigate to & click on a date in the archive calendar; the clicked-
+        ### on date becomes the new active_date, which is returned.
+
+        # If date is "today" or equal to end_date, take the shortcut
+        if date == 'today' or date == self.end_date:
+            try:
+                self.parent.throttle.throttle('date_nav')
+                self._browser.find_element_by_class_name('today').click()
+                self._wait_for_refresh()
+                return self._displayed_month_dt
+            except _NSEE:
+                return False
+
+        # Check that the date is valid (between start & end dates)
+        if not (self.start_date <= date <= self.end_date):
+            raise ValueError(f'`date` argument must be between start and end '
+                             f' dates ({self.start_date} to {self.end_date}).')
+
+        # Get the day to click on
+        new_day = date.day
+
+        # Get the number of months to traverse...
+        months_to_traverse = _diff_month(self.active_date, date)
+
+        if months_to_traverse >= 0:
+            step_direction = 1
+            button_name = 'next'
+        else:
+            step_direction = -1
+            button_name = 'prev'
+
+        # ...and do so.
+        for _ in range(0, months_to_traverse, step_direction):
+            self._traverse_month(button_name)
+
+        # Click the day
+        self.parent.throttle.throttle('date_nav')
+        try:
+            self._browser.find_element_by_xpath(f"//td[@class='day' "
+                                    f"and contains(text(), '{new_day}')]"
+                                    ).click()
+        except:
+            self._browser.find_element_by_xpath(f"//td[@class='active day' "
+                                    f"and contains(text(), '{new_day}')]"
+                                    ).click()
+        self.update()
+        self._att.update()
+
+    def _get_start_date(self):
+        ### Return the earliest navigable date in the archive
+        start_date = None
+
+        # Navigate backward to the beginning month of the archive
+        while self._traverse_month('prev'):
+            pass
+
+        # Grab the beginning month
+        start_month = self._displayed_month_dt
+
+        # Parse the lowest valid day
+        disabled_found = False
+        for day in self._calendar:
+            if day['class'][0] == 'disabled':
+                disabled_found = True
+            elif day['class'][0] in 'day active'.split():
+                start_date = day.text
+                break
+            elif day['class'][0] != 'old' and disabled_found:
+                start_date = day.text
+                break
+
+        # Turn it into a date
+        if start_date:
+            start_date = _dt.date(self._displayed_month_dt.year,
+                                  self._displayed_month_dt.month,
+                                  int(start_date))
+
+        # Navigate back to the current date
+        self.go_to_date('today')
+
+        # Return the start date
+        self.start_date = start_date
+
+    def _parse_calendar_attrs(self):
+        """
+        Populates the following ArchiveCalendar attributes:
+            _calendar: bs4 ResultSet
+                The <td> tags of the currently displayed calendar. See below
+                for details.
+            displayed_month: str
+                The month currently shown in the calendar, as 'Mmmm YYYY'
+            active_date: date
+                If the calendar is displaying the active date, update its value.
+                The active date is always the date for which ATT entries are
+                displayed.
+
+        The _calendar attribute entries have the format
+
+            `<td class="[class]">[D]</td>`
+
+        where
+         - [D] is the one- or two-digit day (as a string) and
+         - [class] is one of
+             "old day"          = a day with archives but in a prior month
+                                  (clicking will refresh the calendar)
+             "day"              = a day in the current month other than the
+                                  active day
+             "active day"       = the day currently displayed in the ATT
+             "disabled day"     = a day for which no archive is available in a
+                                  month (past or future) that has other days
+                                  with archives. For example, if today is July
+                                  27, July 28-31 will be disabled days, as will
+                                  January 1-26 (since the archive goes back only
+                                  180 days). December 31 would be an "old dis-
+                                  abled day".
+             "new disabled day" = a day in a future month
+             "old disabled day" = see explanation in "disabled day"
+        """
+        # Get the tags representing the days currently displayed on the calendar
+        self._calendar = self._contents.find_all('td')
+
+        # Get the displayed month
+        self.displayed_month = self._contents.find('th',
+                                                  {'class': 'datepicker-switch'}
+                                                  ).text
+        # Get the active date, if shown
+        active_day = None
+        for day in self._calendar:
+            if day['class'][0] == 'active':
+                active_day = int(day.text)
+        if active_day:
+            self.active_date = _dt.date(self._displayed_month_dt.year,
+                                    self._displayed_month_dt.month,
+                                    active_day)
+
+    def _scrape_contents(self):
+        ### Scrape the contents of the currently displayed calendar
+        # Scrape the nav page
+        soup = _BeautifulSoup(self._browser.page_source, 'lxml')
+
+        # Isolate & store the calendar contents
+        self._contents = soup.find('table', {'class': 'table-condensed'})
+
+    def _traverse_month(self, direction):
+        ### Click on the 'prev' or 'next' arrow
+        try:
+            self.parent.throttle.throttle('date_nav')
+            self._browser.find_element_by_class_name(direction).click()
+            self._wait_for_refresh()
+            self._scrape_contents()
+            self._parse_calendar_attrs()
+            return self._displayed_month_dt
+        except _ENI:
+            return False
+
+    def _wait_for_refresh(self):
+        # Wait for calendar widget to refresh
+        element = _WebDriverWait(self._browser, 5
+                    ).until(_calendar_to_be_refreshed(self.displayed_month,
+                                                      str(self.active_date.day)
+                                                      ))
+
+    @property
+    def displayed_month(self):
+        return self._displayed_month
+    @displayed_month.setter
+    def displayed_month(self, value):
+        self._displayed_month = value
+
+        if value:
+            month, year = value.split(' ')
+            displayed_month = _MONTHS.index(month)
+            displayed_year = int(year)
+
+            self._displayed_month_dt =  _dt.date(displayed_year,
+                                                 displayed_month, 1)
+
+    @property
+    def entries_for_date(self):
+        return self._att.current_entries
+    @entries_for_date.setter
+    def entries_for_date(self, value):
+        raise AttributeError("archive_entries is read only and cannot be set.")
+
+    def __repr__(self):
+        return (f'ArchiveCalendar(from {self.start_date} to {self.end_date}, '
+                f'active date={self.active_date})')
+
+#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#
+#
+#
+# ArchiveTimesTable
+#-----------------------------------------------------------------------------
+class ArchiveTimesTable:
+    def __init__(self, parent, browser):
+        self.parent = parent
+        self._browser = browser
+
+        ## Wait for ATT to load on navigation page
+        element = _WebDriverWait(self._browser, 10).until(
+                                 _EC.presence_of_element_located((
+                                 _By.CLASS_NAME, 'cursor-link')))
+
+        # Initialize object attributes
+        self._scrape_contents() # Initializes _contents
+        self._parse_entries()   # Initializes current_entries
+        self.last_refresh = None
+
+        # Set up MutationObserver to handle refresh waits for consecutive dates
+        # with no data
+        self._browser.execute_script(
+        """ new MutationObserver(() => {
+                window.lastRefresh = new Date()
+            }).observe(
+            document.querySelector(
+            "table.table.table-striped.table-bordered.hover.dataTable.no-footer"
+            ), {attributes: true, childList: true, subtree: true } )
+        """
+        )
+
+    def update(self):
+        self._wait_for_refresh()
+        self._scrape_contents()
+        self._parse_entries()
+
+    def _parse_entries(self):
+        """
+        Parses file information from the ATT into a list of lists containing
+        three elements:
+            - URI for the mp3 file of the archived radio transmission, which
+              will be used later to find the file's individual download page
+            - Start date & time of the archive file
+            - End date & time of the archive file
+        """
+        # Set up a blank list to return
+        att_entries = []
+
+        # Loop through all rows of the table
+        for row in self._contents.find_all('tr'):
+            # Grab the start & end times from the row's <td> tags
+            file_start, file_end = self._get_entry_datetimes(
+                                    [(each.text) for each
+                                     in row.find_all('td')])
+
+            # Grab the file ID
+            file_uri = row.find('a')['href'].split('/')[-1]
+
+            # Put the file date/time and URL leaf (as a list) into the list
+            att_entries.append([file_uri, file_start, file_end])
+        if att_entries:
+            self.current_entries = att_entries
+            self.current_first_uri = att_entries[0][0]
+        else:
+            self.current_entries = None
+            self.current_first_uri = None
+
+    def _scrape_contents(self):
+        ### Scrape the contents of the currently displayed calendar
+        # Scrape the nav page
+        soup = _BeautifulSoup(self._browser.page_source, 'lxml')
+
+        # Isolate & store the ATT contents
+        self._contents = soup.find('table', attrs={'id': 'archiveTimes'}
+                                  ).find('tbody')
+
+    def _wait_for_refresh(self):
+        # If the ATT previously had entires...
+        if self.current_first_uri:
+            # ...wait until the first entry URI is different
+            element = _WebDriverWait(self._browser, 5).until_not(
+                            _text_to_be_present_in_href((
+                                _By.XPATH, _FIRST_URI_IN_ATT_XPATH),
+                                self.current_first_uri))
+        else:
+            # ...otherwise wait until ATT data has been refreshed
+            element = _WebDriverWait(self._browser, 5).until_not(
+                            _att_to_be_updated((self.last_refresh)))
+
+    def _get_entry_datetimes(self, times):
+        """
+        Convert the archive entry start & end times from a list of strings
+        to a tuple of datetimes
+        """
+        # Set date component to the date currently displayed
+        date = self.parent.active_date
+
+        # Get time objects from the HH:MM AM/PM text
+        hhmm_start, hhmm_end = [ _dt.datetime.strptime(each, '%I:%M %p').time()
+                                for each in times]
+
+        # Set the end time
+        end = _dt.datetime.combine(date, hhmm_end)
+
+        # If the start time is bigger than the end time, the archive starts on
+        # the previous day
+        if hhmm_start > hhmm_end:
+            date -= _dt.timedelta(days=1)
+            start = _dt.datetime.combine(date, hhmm_start)
+        else:
+            start = _dt.datetime.combine(date, hhmm_start)
+
+        return (start, end)
+
+    def __repr__(self):
+        return (f'ArchiveTimesTable()')
+
+
+
+
+
+#-----------------------------------------------------------------------------
+# _NavigatorException
+#-----------------------------------------------------------------------------
+class _NavigatorException(Exception):
+    pass
+
+#-----------------------------------------------------------------------------
+# _RequestThrottle
+#-----------------------------------------------------------------------------
+class _RequestThrottle:
+    """
+    Limits the pace with which requests are sent to Broadcastify's servers.
+    """
+    def __init__(self):
+        self.last_file_req = _timer()
+        self.last_page_req = _timer()
+
+    def throttle(self, type='page', wait=None):
+        """
+        Throttle various types of requests. Valid types are:
+            - 'page': throttle html requests
+            - 'file': throttle mp3 downloads
+            - 'date_nav': throttle clicks on elements of the ArchiveCalendar
+        """
+        duration = wait
+
+        if type == 'page':
+            duration = _PAGE_REQUEST_WAIT
+        elif type == 'file':
+            duration = _FILE_REQUEST_WAIT
+        elif type == 'date_nav':
+            duration = _DATE_NAV_WAIT
+
+
+        self._wait(duration)
+
+    def _wait(self, duration):
+        while not _timer() - self.last_file_req >= duration:
+            pass
+        self.last_file_req = _timer()
+
+
+
+
+
+#-----------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+#
+# Custom Selenium Expected Conditions
+#-----------------------------------------------------------------------------
+
+
+#-----------------------------------------------------------------------------
+# _text_to_be_present_in_href
+#-----------------------------------------------------------------------------
+class _text_to_be_present_in_href(object):
+    """
+    A CUSTOM Selenium expectation for checking if the given text is present in
+    the element's locator, href attribute
+    """
+    def __init__(self, locator, text_):
+        self.locator = locator
+        self.text = text_
+
+    def __call__(self, driver):
+        try:
+            element_text = _EC._find_element(driver,
+                                         self.locator).get_attribute('href')
+            if element_text:
+                return self.text in element_text
+            else:
+                return False
+        except:
+            return False
+
+#-----------------------------------------------------------------------------
+# _att_to_be_updated
+#-----------------------------------------------------------------------------
+class _att_to_be_updated(object):
+    """
+    A CUSTOM Selenium expectation for checking whether the ATT has been updated.
+    """
+    def __init__(self, last_refresh):
+        self.last_refresh = last_refresh
+
+    def __call__(self, driver):
+        try:
+            update = self.browser.execute_script('return window.lastRefresh')
+
+            if update:
+                if last_refresh:
+                    # Convert to a datetime
+                    update = _dt.datetime.strptime(update,
+                                                   '%Y-%m-%dT%H:%M:%S.%fZ')
+                    return self.last_refresh <= update
+                else:
+                    return True
+        except:
+            return False
+
+#-----------------------------------------------------------------------------
+# _calendar_to_be_refreshed
+#-----------------------------------------------------------------------------
+class _calendar_to_be_refreshed(object):
+    """
+    A CUSTOM Selenium expectation for checking whether the calendar has been
+    refreshed.
+    """
+    def __init__(self, displayed_month, active_day):
+        self.active_day = active_day
+        self.displayed_month = displayed_month
+
+    def __call__(self, driver):
+        is_fresh = False
+
+#         try:
+        # Check for displayed_month changes first
+        is_fresh = driver.find_element_by_class_name(
+                    'datepicker-switch').text != self.displayed_month
+
+        # If that hasn't changed...
+        if not is_fresh:
+            # ...see if the active day has
+            is_fresh = driver.find_element_by_class_name(
+                        'active').text != self.active_day
+#         except:
+#             is_fresh = False
+        return is_fresh
