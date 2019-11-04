@@ -49,6 +49,7 @@ from configparser import ConfigParser as _ConfigParser, \
                          ExtendedInterpolation as _ExtendedInterpolation
 from IPython.display import clear_output as _clear_output
 from time import time as _timer
+from tqdm.auto import tqdm, trange
 
 from bs4 import BeautifulSoup as _BeautifulSoup
 
@@ -94,7 +95,6 @@ if len(_config_result) == 0:
 # Base URLs
 _FEED_URL_STEM = _config['base_urls']['FEED_URL_STEM']
 _ARCHIVE_FEED_STEM = _config['base_urls']['ARCHIVE_FEED_STEM']
-_ARCHIVE_DOWNLOAD_STEM = _config['base_urls']['ARCHIVE_DOWNLOAD_STEM']
 _LOGIN_URL = _config['base_urls']['LOGIN_URL']
 
 # Throttle times
@@ -139,7 +139,7 @@ _AUTH_DATA_PATH = _config['authentication_path']['AUTH_DATA_PATH']
 #-----------------------------------------------------------------------------
 def _login_credentials_present(username, password):
     if not username or not password:
-        raise _NavigatorException(
+        raise NavigatorException(
                 "No login credentials supplied.")
     else:
         return True
@@ -152,8 +152,12 @@ def _get_feed_name(feed_id):
             raise ConnectionError(f'Problem connecting: {r.status_code}')
 
         soup = _BeautifulSoup(r.text, 'lxml')
+        try:
+            feed_name = soup.find('span', attrs={'class':'px13'}).text
+        except AttributeError:
+            raise NavigatorException(f'Invalid feed_id ({feed_id}).')
 
-        return soup.find('span', attrs={'class':'px13'}).text
+        return feed_name
 
 def _diff_month(d1, d2):
     return (d2.year - d1.year) * 12 + d2.month - d1.month
@@ -242,9 +246,9 @@ class BroadcastifyArchive:
             will be shown during archive initialization or .download(), since
             requests.Session() is used for those activities.
         """
+        self._verbose = verbose
+        self.show_browser_ui = show_browser_ui
 
-        self.feed_id = feed_id
-        self.feed_name = _get_feed_name(feed_id)
         self.feed_url = _FEED_URL_STEM + feed_id
         self.archive_url = _ARCHIVE_FEED_STEM + feed_id
         self.username = username
@@ -254,10 +258,11 @@ class BroadcastifyArchive:
         self.latest_entry = None
         self.start_date = None
         self.end_date = None
-        self.show_browser_ui = show_browser_ui
         self.throttle = _RequestThrottle()
 
-        self._verbose = verbose
+        self.feed_id = feed_id
+        self.feed_name = _get_feed_name(feed_id)
+
 
         # If username or password was not passed...
         if not username or not password:
@@ -279,30 +284,6 @@ class BroadcastifyArchive:
 
         if self._password == '':
             self.password = None
-
-        # Initialize calendar navigation
-        if self._verbose:
-            print(f'Initializing calendar navigation...')
-
-        # Set whether to show browser UI while fetching
-        options = _Options()
-        if not self.show_browser_ui:
-            options.add_argument('--headless')
-            options.add_argument('--disable-gpu')
-
-        # Launch Chrome
-        with _webdriver.Chrome(chrome_options=options) as browser:
-            browser.get(self.archive_url)
-            self.archive_calendar = ArchiveCalendar(self, browser,
-                                                    get_dates=True)
-            self.start_date = self.archive_calendar.start_date
-            self.end_date = self.archive_calendar.end_date
-
-        self.archive_calendar = None
-
-        if self._verbose:
-            print('Initialization complete.\n')
-            print(self)
 
     def build(self, start=None, end=None, days_back=0, chronological=False,
               rebuild=False):
@@ -405,17 +386,19 @@ class BroadcastifyArchive:
         self.arch_cal = ArchiveCalendar(self, browser)
 
         # Get archive entries for each date in list
-        for i, date in enumerate(date_list):
-            ####_clear_output(wait=True)
-            if self._verbose: print(f'Parsing archive entry for {date} '
-                                    f'({i + 1} of {len(date_list)})')
-
+        t = tqdm(date_list, desc=f'Building dates', leave=True)
+        for date in t:
+        # for i, date in enumerate(date_list):
+            # _clear_output(wait=True)
+            # if self._verbose: print(f'Parsing archive entry for {date} '
+                                    # f'({i + 1} of {len(date_list)})')
+            t.set_description(f'Building {date}', refresh=True)
             self.arch_cal.go_to_date(date)
 
             if self.arch_cal.entries_for_date:
                 archive_entries.extend(self.arch_cal.entries_for_date)
 
-        if self._verbose: print('Processing archive entries...')
+        # if self._verbose: print('Processing archive entries...')
 
         # Empty & replace the current archive entries
         self.entries = []
@@ -430,14 +413,14 @@ class BroadcastifyArchive:
 
             self.entries.append(entry_dict)
 
-        ####_clear_output(wait=True)
+        # _clear_output(wait=True)####
 
         self.earliest_entry = max(self.start_date, start)
         self.latest_entry = min(self.end_date, end)
 
         if self._verbose:
-            print(f'Archive build complete.\n')
-            print(self)
+            # print(f'Archive build complete.\n')
+            print('\n',self)
 
     def download(self, start=None, end=None, all_entries=False,
              output_path=_MP3_OUT_PATH):
@@ -507,11 +490,36 @@ class BroadcastifyArchive:
         dn = ArchiveDownloader(self, login=True, username=self.username,
                                password=self._password, verbose=self._verbose)
 
-        if self._verbose:
-            print(f'{len(filtered_entries)} archive entries matched.')
+        # if self._verbose:
+        #     print(f'{len(filtered_entries)} archive entries matched.')
 
         # Pass them to _DownloadNavigator to get the files
         dn.get_archive_mp3s(filtered_entries, output_path)
+
+    def _get_archive_dates(self):
+        # Initialize calendar navigation
+        if self._verbose:
+            print(f'Initializing calendar navigation for {self.feed_name}...')
+
+        # Set whether to show browser UI while fetching
+        options = _Options()
+        if not self.show_browser_ui:
+            options.add_argument('--headless')
+            options.add_argument('--disable-gpu')
+
+        # Launch Chrome
+        with _webdriver.Chrome(chrome_options=options) as browser:
+            browser.get(self.archive_url)
+            self.archive_calendar = ArchiveCalendar(self, browser,
+                                                    get_dates=True)
+            self.start_date = self.archive_calendar.start_date
+            self.end_date = self.archive_calendar.end_date
+
+        self.archive_calendar = None
+
+        if self._verbose:
+            print('Initialization complete.\n')
+            print(self)
 
     @property
     def feed_id(self):
@@ -524,14 +532,17 @@ class BroadcastifyArchive:
     def feed_id(self, value):
         self._feed_id = value
         self.feed_name = _get_feed_name(value)
+        self.feed_url = _FEED_URL_STEM + value
+        self.archive_url = _ARCHIVE_FEED_STEM + value
+        self.earliest_entry = None
+        self.latest_entry = None
         self.start_date = None
         self.end_date = None
         self.entries = []
         self.earliest_entry = None
         self.latest_entry = None
-        self.feed_url = _FEED_URL_STEM + value
-        self.archive_url = _ARCHIVE_FEED_STEM + value
-        self._an = None
+
+        self._get_archive_dates()
 
     @property
     def password(self):
@@ -556,7 +567,7 @@ class BroadcastifyArchive:
                f'  Start Date: {str(self.start_date)}\n' + \
                f'  End Date:   {str(self.end_date)}\n' + \
                f'  Username = "{self.username}" Password = [{self.password}]\n' + \
-               f"  {'{:,}'.format(len(self.entries))} parsed archive entries "
+               f"  {'{:,}'.format(len(self.entries))} built archive entries "
 
         if not(self.earliest_entry is None and self.latest_entry is None):
             repr += f'between {self.earliest_entry} and {self.latest_entry}'
@@ -580,7 +591,6 @@ class ArchiveDownloader:
         self.download_page_soup = None
         self.current_archive_id = None
         self.verbose = verbose
-        self.throttle = t = _RequestThrottle()
         self.session = s = _requests.Session()
         self.login = l = login
 
@@ -594,15 +604,15 @@ class ArchiveDownloader:
                 'redirect': '/'
             }
 
-            headers = {
-                'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) ' +
-                              'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/' +
-                              '75.0.3770.142 Safari/537.36'
-            }
+            headers = None #{
+                # 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) ' +
+                              # 'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/' +
+                              # '75.0.3770.142 Safari/537.36'
+            # }
 
             _login_credentials_present(username, password)
 
-            t.throttle('file')
+            self._parent.throttle.throttle('page')
             r = s.post(_LOGIN_URL, data=login_data, headers=headers)
 
             if r.status_code != 200:
@@ -611,9 +621,8 @@ class ArchiveDownloader:
     def get_download_soup(self, archive_id):
         self.current_archive_id = archive_id
         s = self.session
-        t = self.throttle
 
-        t.throttle()
+        self._parent.throttle.throttle()
         r = s.get(_ARCHIVE_DOWNLOAD_STEM + archive_id)
         if r.status_code != 200:
             raise ConnectionError(f'Problem connecting to ' +
@@ -625,14 +634,21 @@ class ArchiveDownloader:
 
     def get_archive_mp3s(self, archive_entries, filepath):
         start = _timer()
+        earliest_download = min([entry['start_time']
+                                 for entry in archive_entries])
+        latest_download = max([entry['start_time']
+                            for entry in archive_entries])
 
-        for file in archive_entries:
+        t = tqdm(archive_entries, desc='Downloading mp3s',
+                 leave=True, ncols=800)
+        t.write(f'Downloading files to {filepath}.')
+
+        for file in t:
             feed_id =  self._parent.feed_id
             archive_uri = file['uri']
             file_date = self.__format_entry_date(file['end_time'])
-
-            print(f'Downloading {archive_entries.index(file) + 1} of '
-                  f'{len(archive_entries)}')
+            t.set_description(f'Downloading {earliest_download} to '
+                              f'{latest_download}', refresh=True)
 
             # Build the path for saving the downloaded .mp3
             out_file_name = filepath + '-'.join([feed_id, file_date]) + '.mp3'
@@ -641,18 +657,7 @@ class ArchiveDownloader:
             mp3_soup = self.get_download_soup(archive_uri)
             file_url = self.__parse_mp3_path(mp3_soup)
 
-            if self.verbose:
-                print(f'\tfrom {file_url}')
-                print(f'\tto {out_file_name}')
-
-            self.__fetch_mp3([out_file_name, file_url])
-
-        duration = _timer() - start
-
-        if len(archive_entries) > 0: print('\nDownloads complete.')
-        if self.verbose:
-            print(f'\nRetrieved {len(archive_entries)} files in '
-                  f'{round(duration,4)} seconds.')
+            self.__fetch_mp3([out_file_name, file_url], t)
 
     def __parse_mp3_path(self, download_page_soup):
         """Parse the mp3 filepath from a BeautifulSoup of the download page"""
@@ -660,22 +665,38 @@ class ArchiveDownloader:
                                        {'href': _re.compile('.mp3')}
                                        ).attrs['href']
 
-    def __fetch_mp3(self, entry):
-        # h/t https://markhneedham.com/blog/2018/07/15/python-parallel-
-        # download-files-requests/
-        path, uri = entry
+    def __fetch_mp3(self, entry, main_progress_bar):
+        path, url = entry
+        file_name = url.split('/')[-1]
 
         if not _os.path.exists(path):
-            self.throttle.throttle('file')
-            r = _requests.get(uri, stream=True)
+            self._parent.throttle.throttle('file')
+
+            r = _requests.get(url, stream=True)
+            file_size = int(r.headers['Content-Length'])
+
+            t = tqdm(total=file_size,
+                     desc=f'Downloading {file_name}',
+                     ncols=750,
+                     leave=False)
+
             if r.status_code == 200:
+                self._parent.throttle.got_last_file = True
                 with open(path, 'wb') as f:
                     for chunk in r:
                         f.write(chunk)
-        else:
-            print('\tFile already exists. Skipping.')
+                        t.update(len(chunk))
+            elif r.status_code == 403:
+                t.write(f'\tReceived 403 on {file_name}. Archive file does not '
+                        f' exist. Skipping.')
+            else:
+                t.write(f'\tCould not retrieve {url} (code {r.status_code}'
+                      f'). Skipping.')
 
-        return path
+            t.close()
+
+        else:
+            main_progress_bar.write(f'\t{file_name} already exists. Skipping.')
 
     def __format_entry_date(self, date):
         # Format the ArchiveEntry end time as YYYYMMDD-HHMM
@@ -701,8 +722,9 @@ class ArchiveDownloader:
 #-----------------------------------------------------------------------------
 class ArchiveCalendar:
     def __init__(self, parent, browser, get_dates=False):
-        self.parent = parent
+        self._parent = parent
         self._browser = browser
+        self.active_date = None
 
         ## Wait for calendar to load on navigation page
         element = _WebDriverWait(self._browser, 10).until(
@@ -713,12 +735,19 @@ class ArchiveCalendar:
         self._scrape_contents()        # Initializes _contents
         self._parse_calendar_attrs()   # Initializes _calendar, displayed_month,
                                        # & active_date
+        if not(self.active_date):
+            # When the calendar initially loaded, no active_date was displayed.
+            # This means the archive is no longer available.
+            raise NavigatorException(
+                f'Archive at {self._parent.archive_url} is no longer available '
+                f'(no active date appears when loading the calendar).')
+
         if get_dates:
             self.end_date = self.active_date
             self._get_start_date()     # Initializes start_date
         else:
-            self.end_date = self.parent.end_date
-            self.start_date = self.parent.start_date
+            self.end_date = self._parent.end_date
+            self.start_date = self._parent.start_date
 
         self._att = ArchiveTimesTable(self, browser)
 
@@ -734,7 +763,7 @@ class ArchiveCalendar:
         # If date is "today" or equal to end_date, take the shortcut
         if date == 'today' or date == self.end_date:
             try:
-                self.parent.throttle.throttle('date_nav')
+                self._parent.throttle.throttle('date_nav')
                 self._browser.find_element_by_class_name('today').click()
                 self._wait_for_refresh()
                 return self._displayed_month_dt
@@ -764,7 +793,7 @@ class ArchiveCalendar:
             self._traverse_month(button_name)
 
         # Click the day
-        self.parent.throttle.throttle('date_nav')
+        self._parent.throttle.throttle('date_nav')
         try:
             self._browser.find_element_by_xpath(f"//td[@class='day' "
                                     f"and contains(text(), '{new_day}')]"
@@ -855,9 +884,11 @@ class ArchiveCalendar:
                                                   ).text
         # Get the active date, if shown
         active_day = None
+
         for day in self._calendar:
             if day['class'][0] == 'active':
                 active_day = int(day.text)
+
         if active_day:
             self.active_date = _dt.date(self._displayed_month_dt.year,
                                     self._displayed_month_dt.month,
@@ -874,7 +905,7 @@ class ArchiveCalendar:
     def _traverse_month(self, direction):
         ### Click on the 'prev' or 'next' arrow
         try:
-            self.parent.throttle.throttle('date_nav')
+            self._parent.throttle.throttle('date_nav')
             self._browser.find_element_by_class_name(direction).click()
             self._wait_for_refresh()
             self._scrape_contents()
@@ -925,7 +956,7 @@ class ArchiveCalendar:
 #-----------------------------------------------------------------------------
 class ArchiveTimesTable:
     def __init__(self, parent, browser):
-        self.parent = parent
+        self._parent = parent
         self._browser = browser
 
         ## Wait for ATT to load on navigation page
@@ -969,6 +1000,11 @@ class ArchiveTimesTable:
 
         # Loop through all rows of the table
         for row in self._contents.find_all('tr'):
+            # Look for "No archives available" (dataTables_empty)
+            if row.find_all('td', {'class': 'dataTables_empty'}):
+                # Stop looking for entries
+                break
+
             # Grab the start & end times from the row's <td> tags
             file_start, file_end = self._get_entry_datetimes(
                                     [(each.text) for each
@@ -979,6 +1015,7 @@ class ArchiveTimesTable:
 
             # Put the file date/time and URL leaf (as a list) into the list
             att_entries.append([file_uri, file_start, file_end])
+
         if att_entries:
             self.current_entries = att_entries
             self.current_first_uri = att_entries[0][0]
@@ -1014,7 +1051,7 @@ class ArchiveTimesTable:
         to a tuple of datetimes
         """
         # Set date component to the date currently displayed
-        date = self.parent.active_date
+        date = self._parent.active_date
 
         # Get time objects from the HH:MM AM/PM text
         hhmm_start, hhmm_end = [ _dt.datetime.strptime(each, '%I:%M %p').time()
@@ -1041,9 +1078,9 @@ class ArchiveTimesTable:
 
 
 #-----------------------------------------------------------------------------
-# _NavigatorException
+# NavigatorException
 #-----------------------------------------------------------------------------
-class _NavigatorException(Exception):
+class NavigatorException(Exception):
     pass
 
 #-----------------------------------------------------------------------------
@@ -1056,6 +1093,7 @@ class _RequestThrottle:
     def __init__(self):
         self.last_file_req = _timer()
         self.last_page_req = _timer()
+        self.got_last_file = False
 
     def throttle(self, type='page', wait=None):
         """
@@ -1068,13 +1106,17 @@ class _RequestThrottle:
 
         if type == 'page':
             duration = _PAGE_REQUEST_WAIT
+            self._wait(duration)
         elif type == 'file':
-            duration = _FILE_REQUEST_WAIT
+            if self.got_last_file == True:
+                duration = _FILE_REQUEST_WAIT
+                self.got_last_file = False
+            else:
+                duration = _PAGE_REQUEST_WAIT
+            self._wait(duration)
         elif type == 'date_nav':
             duration = _DATE_NAV_WAIT
-
-
-        self._wait(duration)
+            self._wait(duration)
 
     def _wait(self, duration):
         while not _timer() - self.last_file_req >= duration:
