@@ -31,7 +31,7 @@ from selenium.webdriver.chrome.options import Options as _Options
 from selenium.common.exceptions import NoSuchElementException as _NSEE, \
                                        ElementNotInteractableException as _ENI
 
-
+####import .expected_conditions as _custom_EC
 
 
 #-----------------------------------------------------------------------------
@@ -43,14 +43,14 @@ from selenium.common.exceptions import NoSuchElementException as _NSEE, \
 #
 # Constants & Configs
 #-----------------------------------------------------------------------------
-_parent_dir = _os.path.join(_os.path.dirname(__file__), '..')
-_my_dir = _os.path.abspath(_os.path.dirname(__file__))
-
-_CONFIG_FILENAME = _parent_dir + '/pybartok.ini'
 _MONTHS = ['','January', 'February', 'March',
       'April', 'May', 'June',
       'July', 'August', 'September',
       'October', 'November', 'December']
+
+_parent_dir = _os.path.join(_os.path.dirname(__file__), '..')
+# _my_dir = _os.path.abspath(_os.path.dirname(__file__))
+_CONFIG_FILENAME = _parent_dir + '/pybartok.ini'
 
 _config = _ConfigParser(interpolation=_ExtendedInterpolation())
 _config_result = _config.read(_CONFIG_FILENAME)
@@ -63,6 +63,7 @@ if len(_config_result) == 0:
 # Base URLs
 _FEED_URL_STEM = _config['base_urls']['FEED_URL_STEM']
 _ARCHIVE_FEED_STEM = _config['base_urls']['ARCHIVE_FEED_STEM']
+_ARCHIVE_DOWNLOAD_STEM = _config['base_urls']['ARCHIVE_DOWNLOAD_STEM']
 _LOGIN_URL = _config['base_urls']['LOGIN_URL']
 
 # Throttle times
@@ -423,13 +424,14 @@ class BroadcastifyArchive:
         # Make sure arguments were passed in a valid combination
         if not all_entries:
             if all([not(start), not(end)]):
-                raise ValueError(f'One of `start`, `end`, or `dates` must be'
+                raise ValueError(f'One of `start`, `end`, or `dates` must be '
                                    f'supplied.')
 
-        # Make sure everything is a datetime
-        if not all([isinstance(start, _dt.datetime),
-                    isinstance(end, _dt.datetime)]):
-            raise TypeError(f'`start` and `end` must be of type `datetime`.')
+        # Make sure start and end are either None or a datetime
+        if not((isinstance(start, _dt.datetime) or start is None) and (
+            isinstance(end, _dt.datetime) or end is None)):
+            raise TypeError(f'`start` and `end` must be of type `datetime` or '
+                            f'NoneType.')
 
         # Build the list of download dates; store in filtered_entries
         if all_entries:
