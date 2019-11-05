@@ -64,6 +64,5 @@ If you want quickly make use of pyBArTOK in your own project, this section is fo
 ![broadcastify page structure](assets/img/broadcastify_page_struct.png)<br><br>
 ----
 <br>![belabartok](assets/img/belabartok1.jpg)
-<br><sub><super>**Béla Bartók**</super></sub><br>
-
+<br><sub><super>**[Béla Bartók](https://en.wikipedia.org/wiki/B%C3%A9la_Bart%C3%B3k)**, one of the great 20<super>th</super> centrury composers.</super></sub><br>
 ----
