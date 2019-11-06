@@ -49,7 +49,7 @@ _MONTHS = ['','January', 'February', 'March',
       'October', 'November', 'December']
 
 _parent_dir = _os.path.join(_os.path.dirname(__file__), '..')
-_CONFIG_FILENAME = _parent_dir + '/pybartok.ini'
+_CONFIG_FILENAME = _parent_dir + '/barchtk.ini'
 
 _config = _ConfigParser(interpolation=_ExtendedInterpolation())
 _config_result = _config.read(_CONFIG_FILENAME)
