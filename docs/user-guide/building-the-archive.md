@@ -25,7 +25,7 @@ build(start=None, end=None, days_back=None,
 ##### Valid Date Parameter Combinations
 
 | `start` | `end` | `days_back` | Behavior |
-|---------|-------|-------------|----------|
+|:-------:|:-----:|:-----------:|----------|
 | **Supplied** | Omitted | Omitted | Build entry list from `start` through the last date in the archive calendar, inclusive |
 | Omitted | **Supplied** | Omitted | Build entry list from first date in the archive calendar through `end`, inclusive |
 | **Supplied** | **Supplied** | Omitted | Build entry list from `start` through `end`, inclusive |
