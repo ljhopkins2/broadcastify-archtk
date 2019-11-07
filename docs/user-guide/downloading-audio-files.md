@@ -22,6 +22,7 @@ download(start=None, end=None, all_entries=False,
 | `output_path` | str | Required | The absolute path to which archive entry mp3 files will be written. |
 
 ##### Valid Date Parameter Combinations
+
 | `start` | `end` | `all_entries` | Behavior |
 |---------|-------|---------------|----------|
 | Any | Any | **Supplied** | Retrieve all files; ignore other arguments |

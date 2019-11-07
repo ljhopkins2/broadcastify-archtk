@@ -23,6 +23,7 @@ build(start=None, end=None, days_back=None,
 | `rebuild` | bool | Optional<super>*</super> | Specifies that existing data in the `entries` attribute should be overwritten with data newly fetched from Broadcastify. If the `entries` attribute is not empty, this parameter must be set to `True` or an error will be raised. |
 
 ##### Valid Date Parameter Combinations
+
 | `start` | `end` | `days_back` | Behavior |
 |---------|-------|-------------|----------|
 | **Supplied** | Omitted | Omitted | Build entry list from `start` through the last date in the archive calendar, inclusive |
