@@ -14,8 +14,8 @@ import requests as _requests
 import datetime as _dt
 import warnings as _warnings
 
-from configparser import ConfigParser as _ConfigParser, \
-                         ExtendedInterpolation as _ExtendedInterpolation
+from configparser import ConfigParser as _ConfigParser#, \
+                         # ExtendedInterpolation as _ExtendedInterpolation
 from time import time as _timer
 from tqdm.auto import tqdm as _tqdm
 
@@ -41,55 +41,22 @@ from selenium.common.exceptions import NoSuchElementException as _NSEE, \
 #
 #
 #
-# Constants & Configs
+# Constants
 #-----------------------------------------------------------------------------
 _MONTHS = ['','January', 'February', 'March',
       'April', 'May', 'June',
       'July', 'August', 'September',
       'October', 'November', 'December']
 
-_parent_dir = _os.path.join(_os.path.dirname(__file__), '..')
-_CONFIG_FILENAME = _parent_dir + '/barchtk.ini'
-
-_config = _ConfigParser(interpolation=_ExtendedInterpolation())
-_config_result = _config.read(_CONFIG_FILENAME)
-
-if len(_config_result) == 0:
-    raise FileNotFoundError(_errno.ENOENT,
-                            _os.strerror(_errno.ENOENT),
-                            _CONFIG_FILENAME)
-
-# Base URLs
-_FEED_URL_STEM = _config['base_urls']['FEED_URL_STEM']
-_ARCHIVE_FEED_STEM = _config['base_urls']['ARCHIVE_FEED_STEM']
-_ARCHIVE_DOWNLOAD_STEM = _config['base_urls']['ARCHIVE_DOWNLOAD_STEM']
-_LOGIN_URL = _config['base_urls']['LOGIN_URL']
+_FEED_URL_STEM = 'https://www.broadcastify.com/listen/feed/'
+_ARCHIVE_FEED_STEM = 'https://www.broadcastify.com/archives/feed/'
+_ARCHIVE_DOWNLOAD_STEM = 'https://m.broadcastify.com/archives/id/'
+_LOGIN_URL = 'https://www.broadcastify.com/login/'
 
 # Throttle times
-_FILE_REQUEST_WAIT = _config.getfloat('throttle_times',
-                                      'FILE_REQUEST_WAIT',
-                                      fallback=5)
-_PAGE_REQUEST_WAIT = _config.getfloat('throttle_times',
-                                      'PAGE_REQUEST_WAIT',
-                                      fallback=2)
-_DATE_NAV_WAIT = _config.getfloat('throttle_times',
-                                  'DATE_NAV_WAIT',
-                                  fallback=0.1)
-
-# Selenium
-_WEBDRIVER_PATH = _config.get('selenium_config',
-                              'WEBDRIVER_PATH',
-                              fallback=None)
-
-if _WEBDRIVER_PATH == '': _WEBDRIVER_PATH = None
-
-_FIRST_URI_IN_ATT_XPATH = "//a[contains(@href,'/archives/download/')]"
-
-# Output path
-_MP3_OUT_PATH = _config['output_path']['MP3_OUT_PATH']
-
-# Authentication data
-_AUTH_DATA_PATH = _config['authentication_path']['AUTH_DATA_PATH']
+_FILE_REQUEST_WAIT = 5
+_PAGE_REQUEST_WAIT = 0.5
+_DATE_NAV_WAIT = 0.1
 
 
 
@@ -117,7 +84,7 @@ _AUTH_DATA_PATH = _config['authentication_path']['AUTH_DATA_PATH']
 #-----------------------------------------------------------------------------
 class BroadcastifyArchive:
     def __init__(self, feed_id, username=None, password=None,
-                 show_browser_ui=False):
+                 login_cfg_path=None, show_browser_ui=False):
         """
         A container for Broadcastify feed archive data, and an enginge for re-
         trieving archive entry information & downloading the corresponding mp3
@@ -135,6 +102,10 @@ class BroadcastifyArchive:
             The password for a valid Broadcastify premium account. Note that
             getting the property value will return only "True" (if set) or
             "False" (if not set) to maintain confidentiality.
+        login_cfg_path : str
+            An absolute path to a password configuration file. Allows the user
+            to keep their login information outside the script using the archive
+            for privacy reasons.
         show_browser_ui : bool
             If True, scraping done during initialization and build (which use
             the Selenium webdriver) will be done with the "headless" option set
@@ -188,25 +159,20 @@ class BroadcastifyArchive:
         self.throttle = _RequestThrottle()
 
         # If username or password was not passed...
-        if username is None or password is None:
+        if (username is None or password is None) and login_cfg_path is not None:
             # ...try to get it from the pwd.ini file
-            config_result = _config.read(_AUTH_DATA_PATH)
-            # Replace only if argument was not passed
-            if not(username):
-                self.username = _config['authentication_data']['username']
-            if not(password):
-                self.password = _config['authentication_data']['password']
+            _config = _ConfigParser()
+            config_result = _config.read(login_cfg_path)
 
-        # If still no username/password, set it to null and work it out
-        # later during download().
-        # if self.username == '':
-        #     self.username = None
-        #
-        # if self.password == '':
-        #     self.password = None
+            if len(config_result) != 0:
+                # Replace only if argument was not passed
+                if not(username):
+                    self.username = _config['authentication_data']['username']
+                if not(password):
+                    self.password = _config['authentication_data']['password']
 
         self.feed_id = feed_id
-        self.feed_name = _get_feed_name(feed_id)
+        self._get_feed_name(feed_id)
 
     def build(self, start=None, end=None, days_back=None, chronological=False,
               rebuild=False):
@@ -319,6 +285,7 @@ class BroadcastifyArchive:
 
         # Spin up a browser and an ArchiveCalendar
         # Set whether to show browser UI while fetching
+        print('Launching webdriver...')
         options = _Options()
         if not self.show_browser_ui:
             options.add_argument('--headless')
@@ -330,7 +297,8 @@ class BroadcastifyArchive:
         self.arch_cal = ArchiveCalendar(self, browser)
 
         # Get archive entries for each date in list
-        t = _tqdm(date_list, desc=f'Building dates', leave=True)
+        t = _tqdm(date_list, desc=f'Building dates', leave=True,
+                  dynamic_ncols=True)
         for date in t:
             t.set_description(f'Building {date}', refresh=True)
             self.arch_cal.go_to_date(date)
@@ -359,7 +327,7 @@ class BroadcastifyArchive:
         print(self)
 
     def download(self, start=None, end=None, all_entries=False,
-             output_path=_MP3_OUT_PATH):
+             output_path=None):
         """
         Retrieve URIs and download mp3 files for the Broadcastify archive.
 
@@ -459,7 +427,7 @@ class BroadcastifyArchive:
         print('Initialization complete.\n')
         print(self)
 
-    def _get_feed_name(feed_id):
+    def _get_feed_name(self, feed_id):
         s = _requests.Session()
         with s:
             r = s.get(_FEED_URL_STEM + feed_id)
@@ -473,7 +441,7 @@ class BroadcastifyArchive:
             except AttributeError:
                 raise NavigatorException(f'Invalid feed_id ({feed_id}).')
 
-            return feed_name
+            self.feed_name = feed_name
 
     @property
     def feed_id(self):
@@ -484,7 +452,7 @@ class BroadcastifyArchive:
     def feed_id(self, value):
         # Changing the feed_id re-initializes the object's other properties
         self._feed_id = value
-        self.feed_name = _get_feed_name(value)
+        self._get_feed_name(value)
         self.feed_url = _FEED_URL_STEM + value
         self.archive_url = _ARCHIVE_FEED_STEM + value
         self.earliest_entry = None
@@ -596,7 +564,7 @@ class ArchiveDownloader:
                             for entry in archive_entries])
 
         t = _tqdm(archive_entries, desc='Downloading mp3s',
-                 leave=True, ncols=800)
+                 leave=True, dynamic_ncols=True)
         t.write(f'Downloading files to {filepath}.')
 
         for file in t:
@@ -636,7 +604,7 @@ class ArchiveDownloader:
 
             t = _tqdm(total=file_size,
                      desc=f'Downloading {file_name}',
-                     ncols=750,
+                     dynamic_ncols=True,
                      leave=False)
 
             if r.status_code == 200:
@@ -757,7 +725,7 @@ class ArchiveCalendar:
         new_day = date.day
 
         # Get the number of months to traverse...
-        months_to_traverse = _diff_month(self.active_date, date)
+        months_to_traverse = self._diff_month(self.active_date, date)
 
         if months_to_traverse >= 0:
             step_direction = 1
@@ -785,7 +753,7 @@ class ArchiveCalendar:
 
         return self._displayed_month_dt
 
-    def _diff_month(d1, d2):
+    def _diff_month(self, d1, d2):
         return (d2.year - d1.year) * 12 + d2.month - d1.month
 
     def _get_start_date(self):
@@ -1022,10 +990,12 @@ class ArchiveTimesTable:
     def _wait_for_refresh(self):
         # If the ATT previously had entires...
         if self.current_first_uri:
+            _first_uri_xpath = "//a[contains(@href,'/archives/download/')]"
+
             # ...wait until the first entry URI is different
             element = _WebDriverWait(self._browser, 5).until_not(
                             _text_to_be_present_in_href((
-                                _By.XPATH, _FIRST_URI_IN_ATT_XPATH),
+                                _By.XPATH, _first_uri_xpath),
                                 self.current_first_uri))
         else:
             # ...otherwise wait until ATT data has been refreshed
