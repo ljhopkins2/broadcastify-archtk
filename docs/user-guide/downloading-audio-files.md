@@ -23,7 +23,7 @@ download(start=None, end=None, all_entries=False,
 
 ##### Valid Date Parameter Combinations
 | `start` | `end` | `all_entries` | Behavior |
-|:-------:|:-----:|:-----------:|:---------|
+|---------|-------|---------------|----------|
 | Any | Any | **Supplied** | Retrieve all files; ignore other arguments |
 | **Supplied** | Omitted | Omitted | Retrieve from the earliest archive file through the file covering `end` |
 | Omitted | **Supplied** | Omitted | Retrieve from the archive file containing `start` through the last archive file |

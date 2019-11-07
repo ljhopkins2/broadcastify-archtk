@@ -7,7 +7,7 @@ nav_order: 3
 
 # Building the Archive
 
-The `.build()` method builds archive entry data for the archive and populates it as a dictionary to the `BroadcastifyArchive.entries` attribute.
+The `.build()` method retrieves archive entry data for the archive and populates it as a dictionary to the `BroadcastifyArchive.entries` attribute.
 
 ```python
 build(start=None, end=None, days_back=None,
@@ -24,7 +24,7 @@ build(start=None, end=None, days_back=None,
 
 ##### Valid Date Parameter Combinations
 | `start` | `end` | `days_back` | Behavior |
-|:-------:|:-----:|:-----------:|:---------|
+|---------|-------|-------------|----------|
 | **Supplied** | Omitted | Omitted | Build entry list from `start` through the last date in the archive calendar, inclusive |
 | Omitted | **Supplied** | Omitted | Build entry list from first date in the archive calendar through `end`, inclusive |
 | **Supplied** | **Supplied** | Omitted | Build entry list from `start` through `end`, inclusive |
