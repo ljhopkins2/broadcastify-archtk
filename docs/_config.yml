@@ -52,8 +52,8 @@ color_scheme: nil
 # e.g, UA-1234567-89
 # ga_tracking: UA-2709176-10
 
-plugins:
-  - jekyll-seo-tag
+# plugins:
+#   - jekyll-seo-tag
 
 compress_html:
   clippings: all
