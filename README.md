@@ -1,38 +1,25 @@
-# The python Broadcastify Archive Tool Kit (pybartok)
+# The python Broadcastify ARchive TOol Kit (pyBArTOK)
 
 **Version 0.6**<br>
 _Updated 5 Nov 2019_
 
-## Quick Links
-
-- pybartok on pyPI.org
-- Documentation
-- Find a bug? Have an enhancement suggestion? Log an issue.
-
 ## Preface
 
-The python Broadcastify Archive Tool Kit automates downloading audio archives from [Broadcastify](www.broadcastify.com), "the world's largest source of Public Safety, Airline, Rail, and Marine live audio streams".
+The python Broadcastify Archive Tool Kit (pyBArTOK) automates downloading audio archives from [Broadcastify](www.broadcastify.com), "the world's largest source of Public Safety, Airline, Rail, and Marine live audio streams".
 
-The tool was initially developed as part of a group project during the summer 2019 [General Assembly Data Science Immersive program](https://generalassemb.ly/education/data-science-immersive/), in response to a client's need to visualize where first responders were being dispatched during emergencies. We sought out a large repository of emergency radio dispatches to train our audio-to-text-to-geolocation algorithm. Although Broadcastify was the clear winner in terms of breadth and depth, the lack of an API for downloading archived audio meant that the process for acquiring the data was highly manual and time-consuming.
+pyBArTOK was initially developed as part of a group project during the summer 2019 [General Assembly Data Science Immersive program](https://generalassemb.ly/education/data-science-immersive/), in response to a client's need to visualize where first responders were being dispatched during emergencies. We sought out a large repository of emergency radio dispatches to train our audio-to-text-to-geolocation algorithm. Although Broadcastify was the clear winner in terms of breadth and depth, the lack of an API for downloading archived audio meant that the process for acquiring the data was highly manual and time-consuming.
 
-pybartok solves that problem.
-
-(Yes, the acronym is a bit of a stretch. But it was available on pyPI.org, and I've always loved [Béla Bartók's music](https://www.youtube.com/watch?v=dPZ_NFyn5Xw), so I went with it.)
-
-----
-![belabartok](assets/img/belabartok1.jpg)
-<sub><super>**[Béla Bartók](https://en.wikipedia.org/wiki/B%C3%A9la_Bart%C3%B3k)**, one of the great 20th century composers.</super></sub>
-----
+pyBArTOK solves that problem.
 
 ## Quick-start Guide
 
-If you want quickly make use of pybartok in your own project, this section is for you! The instructions assume you're using a Jupyter Notebook and python.
+If you want quickly make use of pyBArTOK in your own project, this section is for you! The instructions assume you're using a Jupyter Notebook and python.
 
 1. **Get a Broadcastify Premium account.** Access to the archives is behind a paywall. For $15, you can get 180 days of preimium access.
     - More information at https://m.broadcastify.com/premium/
 
-1. **Copy the library file.** It contains the pybartok source code.
-    - Put `pybartok.py` into the same directory as your `.ipynb` file<br><br>
+1. **Copy the library file.** It contains the pyBArTOK source code.
+    - Put `pyBArTOK.py` into the same directory as your `.ipynb` file<br><br>
 
 1. **Copy and modify the config files.** The system needs two config files to run:
     - `pybartok.ini`
@@ -47,7 +34,7 @@ If you want quickly make use of pybartok in your own project, this section is fo
 1. **Install selenium**. Selenium is a browser emulator used to interact with Broadcastify's archive navigation tools.
     - Install with `pip install -U selenium`<br><br>
 
-1. **Get a browser driver**. Selenium requires a driver to interface with your chosen browser. All testing for pybartok is done with the Chrome browser driver (currently v77).
+1. **Get a browser driver**. Selenium requires a driver to interface with your chosen browser. All testing for pyBArTOK is done with the Chrome browser driver (currently v77).
     - Install [Chrome's browser driver](https://sites.google.com/a/chromium.org/chromedriver/downloads), or the browser of your choice (see [the list on the selenium pyPI page](https://pypi.org/project/selenium/)
     - You must either
       1. ensure the driver is in your computer's `PATH` (here's [a great resource for Mac users](https://www.architectryan.com/2012/10/02/add-to-the-path-on-mac-os-x-mountain-lion/#.Uydjga1dXDg) on that front) OR
@@ -64,7 +51,7 @@ If you want quickly make use of pybartok in your own project, this section is fo
     - `requests`
     - `time`<br><br>
 
-1. **Take a test spin.** Give the [pybartok demo](https://github.com/ljhopkins2/`pybartok`/blob/master/pybartok_demo.ipynb) a try.
+1. **Take a test spin.** Give the [pyBArTOK demo](https://github.com/ljhopkins2/`pyBArTOK`/blob/master/pybartok_demo.ipynb) a try.
 
 ## <span style="color:red">**USER DOCUMENTATION UNDER DEVELOPMENT**</span>
 
@@ -74,3 +61,8 @@ If you want quickly make use of pybartok in your own project, this section is fo
 ## FAQ
 * How are Broadcastify archive pages structured?<br>
 ![broadcastify page structure](assets/img/broadcastify_page_struct.png)<br><br>
+----
+<br>![belabartok](assets/img/belabartok1.jpg)
+<br><sub><super>**[Béla Bartók](https://en.wikipedia.org/wiki/B%C3%A9la_Bart%C3%B3k)**, one of the great 20<super>th</super> centrury composers.</super></sub><br>
+
+----
