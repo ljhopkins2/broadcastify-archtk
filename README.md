@@ -18,12 +18,11 @@ If you want quickly make use of pyBArTOK in your own project, this section is fo
 1. **Get a Broadcastify Premium account.** Access to the archives is behind a paywall. For $15, you can get 180 days of preimium access.
     - More information at https://m.broadcastify.com/premium/
 
-
 1. **Copy the library file.** It contains the pyBArTOK source code.
     - Put `pyBArTOK.py` into the same directory as your `.ipynb` file<br><br>
 
 1. **Copy and modify the config files.** The system needs two config files to run:
-    - `config.ini`
+    - `pybartok.ini`
         - Ensure it's in the same directory as the `.py` & `.ipynb` files
         - Edit the `MP3_OUT_PATH` value to point to where you want to store `mp3` files. Note that _the directory must exist before downloading archive files_, or you'll get an error
         - Edit the `AUTH_DATA_PATH` value to point to your `pwd.ini`

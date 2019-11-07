@@ -1,36 +1,4 @@
 #-----------------------------------------------------------------------------
-#
-# This work is licensed under a GNU Affero General Public License v3.0. See
-# the GitHub repo for more details:
-# https://github.com/ljhopkins2/BArT/blob/master/LICENSE
-#
-#-----------------------------------------------------------------------------
-
-#-----------------------------------------------------------------------------
-#
-# The _B_roadcastify _AR_chive _T_oolkit
-# v1.0-beta
-#
-#   |\/\/\/|  +------------------------+
-#   |      |  | Eat my shortwave, man. |
-#   |      |  +------------------------+
-#   | (o)(o)    /
-#   C      _)  /
-#    | ,___|
-#    |   /
-#   /____\
-#  /      \
-#
-# Artwork source: https://www.asciiart.eu/cartoons/simpsons
-#
-#-----------------------------------------------------------------------------
-
-
-# Throughout the file, "ATT" is short for "archiveTimes table", which contains
-# archive entry information for the date selected in the navigation calendar
-
-
-#-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
@@ -44,12 +12,12 @@ import os as _os
 import re as _re
 import requests as _requests
 import datetime as _dt
+import warnings as _warnings
 
-from configparser import ConfigParser as _ConfigParser, \
-                         ExtendedInterpolation as _ExtendedInterpolation
-from IPython.display import clear_output as _clear_output
+from configparser import ConfigParser as _ConfigParser#, \
+                         # ExtendedInterpolation as _ExtendedInterpolation
 from time import time as _timer
-from tqdm.auto import tqdm, trange
+from tqdm.auto import tqdm as _tqdm
 
 from bs4 import BeautifulSoup as _BeautifulSoup
 
@@ -66,7 +34,6 @@ from selenium.common.exceptions import NoSuchElementException as _NSEE, \
 
 
 
-
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
@@ -74,93 +41,22 @@ from selenium.common.exceptions import NoSuchElementException as _NSEE, \
 #
 #
 #
-# Constants & Configs
+# Constants
 #-----------------------------------------------------------------------------
-_CONFIG_FILENAME = 'config.ini'
 _MONTHS = ['','January', 'February', 'March',
       'April', 'May', 'June',
       'July', 'August', 'September',
       'October', 'November', 'December']
 
-_NO_ATT_DATA = -1
-
-_config = _ConfigParser(interpolation=_ExtendedInterpolation())
-_config_result = _config.read(_CONFIG_FILENAME)
-
-if len(_config_result) == 0:
-    raise FileNotFoundError(_errno.ENOENT,
-                            _os.strerror(_errno.ENOENT),
-                            _CONFIG_FILENAME)
-
-# Base URLs
-_FEED_URL_STEM = _config['base_urls']['FEED_URL_STEM']
-_ARCHIVE_FEED_STEM = _config['base_urls']['ARCHIVE_FEED_STEM']
-_LOGIN_URL = _config['base_urls']['LOGIN_URL']
+_FEED_URL_STEM = 'https://www.broadcastify.com/listen/feed/'
+_ARCHIVE_FEED_STEM = 'https://www.broadcastify.com/archives/feed/'
+_ARCHIVE_DOWNLOAD_STEM = 'https://m.broadcastify.com/archives/id/'
+_LOGIN_URL = 'https://www.broadcastify.com/login/'
 
 # Throttle times
-_FILE_REQUEST_WAIT = _config.getfloat('throttle_times',
-                                      'FILE_REQUEST_WAIT',
-                                      fallback=5)
-_PAGE_REQUEST_WAIT = _config.getfloat('throttle_times',
-                                      'PAGE_REQUEST_WAIT',
-                                      fallback=2)
-_DATE_NAV_WAIT = _config.getfloat('throttle_times',
-                                      'DATE_NAV_WAIT',
-                                      fallback=0.1)
-
-# Selenium
-_WEBDRIVER_PATH = _config.get('selenium_config',
-                              'WEBDRIVER_PATH',
-                              fallback=None)
-
-if _WEBDRIVER_PATH == '':
-    _WEBDRIVER_PATH = None
-
-_FIRST_URI_IN_ATT_XPATH = "//a[contains(@href,'/archives/download/')]"
-
-# Output path
-_MP3_OUT_PATH = _config['output_path']['MP3_OUT_PATH']
-
-# Authentication data
-_AUTH_DATA_PATH = _config['authentication_path']['AUTH_DATA_PATH']
-
-
-
-
-
-#-----------------------------------------------------------------------------
-#-----------------------------------------------------------------------------
-#-----------------------------------------------------------------------------
-#-----------------------------------------------------------------------------
-#
-#
-#
-# Functions
-#-----------------------------------------------------------------------------
-def _login_credentials_present(username, password):
-    if not username or not password:
-        raise NavigatorException(
-                "No login credentials supplied.")
-    else:
-        return True
-
-def _get_feed_name(feed_id):
-    s = _requests.Session()
-    with s:
-        r = s.get(_FEED_URL_STEM + feed_id)
-        if r.status_code != 200:
-            raise ConnectionError(f'Problem connecting: {r.status_code}')
-
-        soup = _BeautifulSoup(r.text, 'lxml')
-        try:
-            feed_name = soup.find('span', attrs={'class':'px13'}).text
-        except AttributeError:
-            raise NavigatorException(f'Invalid feed_id ({feed_id}).')
-
-        return feed_name
-
-def _diff_month(d1, d2):
-    return (d2.year - d1.year) * 12 + d2.month - d1.month
+_FILE_REQUEST_WAIT = 5
+_PAGE_REQUEST_WAIT = 0.5
+_DATE_NAV_WAIT = 0.1
 
 
 
@@ -188,41 +84,46 @@ def _diff_month(d1, d2):
 #-----------------------------------------------------------------------------
 class BroadcastifyArchive:
     def __init__(self, feed_id, username=None, password=None,
-                 show_browser_ui=False, verbose=True):
+                 login_cfg_path=None, show_browser_ui=False):
         """
         A container for Broadcastify feed archive data, and an enginge for re-
-        trieving archive entry information and downloading the corresponding mp3
-        files. Initializes to an empty container. See user documentation for
-        information about dependencies (including Selenium, the WebDriver for
-        Chrome, and BeautifulSoup 4).
+        trieving archive entry information & downloading the corresponding mp3
+        files. Populates feed name, feed & archive URLs, and start & end dates
+        on initialization.
 
-        Parameters
-        ----------
+        Init Parameters
+        ---------------
         feed_id : str
             The unique feed identifier the container will represent, taken from
             https://www.broadcastify.com/listen/feed/[feed_id].
         username : str
             The username for a valid Broadcastify premium account.
         password : str
-            The password for a valid Broadcastify premium account.
-        verbose : bool
-            If True, the system will generate more verbose output during longer
-            operations.
+            The password for a valid Broadcastify premium account. Note that
+            getting the property value will return only "True" (if set) or
+            "False" (if not set) to maintain confidentiality.
+        login_cfg_path : str
+            An absolute path to a password configuration file. Allows the user
+            to keep their login information outside the script using the archive
+            for privacy reasons.
+        show_browser_ui : bool
+            If True, scraping done during initialization and build (which use
+            the Selenium webdriver) will be done with the "headless" option set
+            to False, resulting in a visible browser window being open in the UI
+            during scraping. Otherwise, scraping will be done "invisibly".
 
-        Attributes & Properties
-        -----------------------
-        feed_id  : str
-        username : str
-        password : str
-            Same as init parameter
+            Note that no browser will be shown during download, since
+            requests.Session() is used, not Selenium.
+
+
+        Other Attributes & Properties
+        -----------------------------
         feed_url : str
             Full https URL for the feed's main "listen" page.
         archive_url : str
             Full https URL for the feed's archive page.
         entries : dictionary
             Container for archive entry information.
-            feed_id : str
-                [Populated at .build] Same as feed_id parameter.
             uri : str
                 [Populated at .build] The unique ID for an individual archive
                 file page, which corresponds to a feed's transmissions over a
@@ -233,20 +134,17 @@ class BroadcastifyArchive:
                 [Populated at .build] Beginning time of the archive entry.
             end_time : datetime
                 [Populated at .build] Ending time of the archive entry.
-            mp3_url : str
-                [Populated at .download] The URL of the corresponding mp3 file.
         earliest_entry : datetime
         latest_entry   : datetime
             The datetime of the earliest/latest archive entry currently in
             `entries`.
-        show_browser_ui : Boolean
-            If true, Selenium will open a Chrome browser window in the UI and
-            display browser activity during .build() navigation page scraping;
-            otherwise, scraping will happen "invisibly". Note that no browser
-            will be shown during archive initialization or .download(), since
-            requests.Session() is used for those activities.
+        start_date : datetime
+        end_date   : datetime
+            The datetime of the earliest/latest dates on the archive's calendar.
+        throttle : _RequestThrottle
+            (INTERNAL USE ONLY) Throttle http requests to the Broadcastify
+            servers.
         """
-        self._verbose = verbose
         self.show_browser_ui = show_browser_ui
 
         self.feed_url = _FEED_URL_STEM + feed_id
@@ -260,32 +158,23 @@ class BroadcastifyArchive:
         self.end_date = None
         self.throttle = _RequestThrottle()
 
-        self.feed_id = feed_id
-        self.feed_name = _get_feed_name(feed_id)
-
-
         # If username or password was not passed...
-        if not username or not password:
+        if (username is None or password is None) and login_cfg_path is not None:
             # ...try to get it from the pwd.ini file
-            config_result = _config.read(_AUTH_DATA_PATH)
+            _config = _ConfigParser()
+            config_result = _config.read(login_cfg_path)
 
-            if len(config_result) == 0:
-                raise FileNotFoundError(_errno.ENOENT,
-                                        _os.strerror(_errno.ENOENT),
-                                        _AUTH_DATA_PATH)
+            if len(config_result) != 0:
+                # Replace only if argument was not passed
+                if not(username):
+                    self.username = _config['authentication_data']['username']
+                if not(password):
+                    self.password = _config['authentication_data']['password']
 
-            self.username = _config['authentication_data']['username']
-            self.password = _config['authentication_data']['password']
+        self.feed_id = feed_id
+        self._get_feed_name(feed_id)
 
-        # If still no username/password, set it to null and work it out
-        # later during download().
-        if self.username == '':
-            self.username = None
-
-        if self._password == '':
-            self.password = None
-
-    def build(self, start=None, end=None, days_back=0, chronological=False,
+    def build(self, start=None, end=None, days_back=None, chronological=False,
               rebuild=False):
         """
         Build archive entry data for the BroadcastifyArchive's feed_id and
@@ -294,13 +183,16 @@ class BroadcastifyArchive:
         Parameters
         ----------
             start : datetime.date
-                The earliest date for which to populate the archive
+                The earliest date for which to populate the archive. If None,
+                go from the earliest date on the calendar (inclusive).
             end : datetime.date
-                The earliest date for which to populate the archive
+                The earliest date for which to populate the archive. If None,
+                go to the latest date on the calendar (inclusive).
             days_back : int
                 The number of days before the current day to retrieve informa-
                 tion for. A value of `0` retrieves only archive entries corres-
-                ponding to the current day.
+                ponding to the current day. Pass either days_back OR a valid
+                combination of start/end dates.
             chronological : bool
                 By default, start with the latest date and work backward in
                 time. If True, reverse that.
@@ -311,8 +203,8 @@ class BroadcastifyArchive:
         # Prevent the user from unintentionally erasing existing archive info
         if self.entries and not rebuild:
             raise ValueError(f'Archive already built: Entries already exist for'
-                             f'this BroadcastifyArchive. To erase and rebuild, '
-                             f'specify `rebuild=True` when calling .build()')
+                             f' this BroadcastifyArchive. To erase and rebuild,'
+                             f' specify `rebuild=True` when calling .build()')
 
         # Make sure valid arguments were passed
         ## Either start/end or days_back; not both
@@ -321,19 +213,35 @@ class BroadcastifyArchive:
                              f'combination. Both were passed.')
 
         ## `days_back` must be a non-negative integer
-        if days_back:
+        if days_back is not None:
+            bad_days_back = False
             try:
-                days_back = int(days_back)
-                if days_back < 0: days_back = 0
+                if days_back < 0:
+                    bad_days_back = True
             except:
+                bad_days_back = True
+
+            if bad_days_back:
                 raise TypeError(f'`days_back` must be a non-negative integer.')
 
-        # Build the list of dates to scrape
-        ## If we're using start & end dates (not days back)...
-        out_of_range = ''
+            # Capture the archive end date to count back from
+            end = self.end_date
 
-        if not days_back:
-            # Check that `start` and `end` within archive's start & end dates
+            # Make sure days_back is no larger than the archive date range size
+            start = self.start_date
+            archive_size = (end - start).days
+            if days_back > archive_size:
+                _warnings.warn(f"The number of days_back passed ({days_back}) "
+                               f"exceeds the size of the archive's date range ("
+                               f"{archive_size}). Only valid dates will be "
+                               f"built.")
+                days_back = archive_size
+
+        else:
+            ## Check that `start` and `end` within archive's start/end dates
+            ## If they weren't passed, set them to the archive's start/end dates
+            out_of_range = ''
+
             if start:
                 if start < self.start_date:
                     out_of_range = (f'start date out of archive range: '
@@ -357,24 +265,27 @@ class BroadcastifyArchive:
             if out_of_range:
                 raise AttributeError(out_of_range)
 
-            # Get the size of the date range
+            ## `start` cannot be > `end`
+            if start > end:
+                raise AttributeError(f'`start` date ({start}) cannot be after '
+                                     f'`end` date ({end}).')
+
+            # Get size of the date range
             days_back = (end - start).days
 
-        ## `start` cannot be > `end`
-        if start > end:
-            raise AttributeError(f'`start` date ({start}) cannot be after `end` '
-                                 f'date ({end}).')
-
-        # Adjust for the exclusive end of range()
+        # Adjust for exclusive end of range()
         days_back += 1
 
-        date_list = sorted([end - _dt.timedelta(days=x) for x in range(days_back)],
+        # Build the list of dates to scrape
+        date_list = sorted([end - _dt.timedelta(days=x)
+                           for x in range(days_back)],
                            reverse=not(chronological))
 
         archive_entries = []
 
         # Spin up a browser and an ArchiveCalendar
         # Set whether to show browser UI while fetching
+        print('Launching webdriver...')
         options = _Options()
         if not self.show_browser_ui:
             options.add_argument('--headless')
@@ -386,19 +297,14 @@ class BroadcastifyArchive:
         self.arch_cal = ArchiveCalendar(self, browser)
 
         # Get archive entries for each date in list
-        t = tqdm(date_list, desc=f'Building dates', leave=True)
+        t = _tqdm(date_list, desc=f'Building dates', leave=True,
+                  dynamic_ncols=True)
         for date in t:
-        # for i, date in enumerate(date_list):
-            # _clear_output(wait=True)
-            # if self._verbose: print(f'Parsing archive entry for {date} '
-                                    # f'({i + 1} of {len(date_list)})')
             t.set_description(f'Building {date}', refresh=True)
             self.arch_cal.go_to_date(date)
 
             if self.arch_cal.entries_for_date:
                 archive_entries.extend(self.arch_cal.entries_for_date)
-
-        # if self._verbose: print('Processing archive entries...')
 
         # Empty & replace the current archive entries
         self.entries = []
@@ -413,17 +319,15 @@ class BroadcastifyArchive:
 
             self.entries.append(entry_dict)
 
-        # _clear_output(wait=True)####
+        self.earliest_entry = min([entry['end_time']
+                                   for entry in self.entries]).date()
+        self.latest_entry = max([entry['end_time']
+                                 for entry in self.entries]).date()
 
-        self.earliest_entry = max(self.start_date, start)
-        self.latest_entry = min(self.end_date, end)
-
-        if self._verbose:
-            # print(f'Archive build complete.\n')
-            print('\n',self)
+        print(self)
 
     def download(self, start=None, end=None, all_entries=False,
-             output_path=_MP3_OUT_PATH):
+             output_path=None):
         """
         Retrieve URIs and download mp3 files for the Broadcastify archive.
 
@@ -455,17 +359,24 @@ class BroadcastifyArchive:
         output_path : str (optional)
             The local path to which archive entry mp3 files will be written. The
             path must exist before calling the method. Defaults to the value
-            supplied in config.ini -> _MP3_OUT_PATH.
+            supplied in the initiailzation file.
         """
         # Make sure arguments were passed in a valid combination
         if not all_entries:
             if all([not(start), not(end)]):
-                raise ValueError(f'One of `start`, `end`, or `dates` must be'
-                                   f'supplied.')
+                raise ValueError(f'One of `start` or `end` dates must be '
+                                   f'supplied, or all_entries must be set to '
+                                   f'True.')
 
-        # Make sure everything is a datetime
-        if not all([isinstance(start, _dt.datetime), isinstance(end, _dt.datetime)]):
+        # Make sure start and end are either None or a datetime
+        if not((isinstance(start, _dt.datetime) or start is None) and (
+            isinstance(end, _dt.datetime) or end is None)):
             raise TypeError(f'`start` and `end` must be of type `datetime`.')
+
+        # Make sure an output_path was given
+        if output_path == '':
+            raise TypeError(f'No output path was given. Supply one as an '
+                            f'argument or in the initialization file.')
 
         # Build the list of download dates; store in filtered_entries
         if all_entries:
@@ -488,18 +399,14 @@ class BroadcastifyArchive:
 
         # Retrieve the file URIs
         dn = ArchiveDownloader(self, login=True, username=self.username,
-                               password=self._password, verbose=self._verbose)
-
-        # if self._verbose:
-        #     print(f'{len(filtered_entries)} archive entries matched.')
+                               password=self.__password)
 
         # Pass them to _DownloadNavigator to get the files
         dn.get_archive_mp3s(filtered_entries, output_path)
 
     def _get_archive_dates(self):
         # Initialize calendar navigation
-        if self._verbose:
-            print(f'Initializing calendar navigation for {self.feed_name}...')
+        print(f'Initializing calendar navigation for {self.feed_name}...')
 
         # Set whether to show browser UI while fetching
         options = _Options()
@@ -517,21 +424,35 @@ class BroadcastifyArchive:
 
         self.archive_calendar = None
 
-        if self._verbose:
-            print('Initialization complete.\n')
-            print(self)
+        print('Initialization complete.\n')
+        print(self)
+
+    def _get_feed_name(self, feed_id):
+        s = _requests.Session()
+        with s:
+            r = s.get(_FEED_URL_STEM + feed_id)
+            if r.status_code != 200:
+                raise ConnectionError(f'Problem connecting while getting feed name: '
+                                      f' {r.status_code}')
+
+            soup = _BeautifulSoup(r.text, 'lxml')
+            try:
+                feed_name = soup.find('span', attrs={'class':'px13'}).text
+            except AttributeError:
+                raise NavigatorException(f'Invalid feed_id ({feed_id}).')
+
+            self.feed_name = feed_name
 
     @property
     def feed_id(self):
-        """
-        Unique ID for the Broadcastify feed. Taken from
-        https://www.broadcastify.com/listen/feed/[feed_id]
-        """
+        # Unique ID for the Broadcastify feed. Taken from
+        # https://www.broadcastify.com/listen/feed/[feed_id]
         return self._feed_id
     @feed_id.setter
     def feed_id(self, value):
+        # Changing the feed_id re-initializes the object's other properties
         self._feed_id = value
-        self.feed_name = _get_feed_name(value)
+        self._get_feed_name(value)
         self.feed_url = _FEED_URL_STEM + value
         self.archive_url = _ARCHIVE_FEED_STEM + value
         self.earliest_entry = None
@@ -546,17 +467,15 @@ class BroadcastifyArchive:
 
     @property
     def password(self):
-        """
-        Password for Broadcastify premium account. Getting the property
-        will return a Boolean indicating whether the password has been set.
-        """
-        if self._password:
+        # Password for Broadcastify premium account. Getting the property
+        # will return a Boolean indicating whether the password has been set.
+        if self.__password:
             return True
         else:
             return False
     @password.setter
     def password(self, value):
-        self._password = value
+        self.__password = value
 
     def __repr__(self):
         repr = f'BroadcastifyArchive\n' + \
@@ -570,11 +489,16 @@ class BroadcastifyArchive:
                f"  {'{:,}'.format(len(self.entries))} built archive entries "
 
         if not(self.earliest_entry is None and self.latest_entry is None):
-            repr += f'between {self.earliest_entry} and {self.latest_entry}'
-
-        repr += f'\n  Verbose = {self._verbose})'
+            if self.earliest_entry == self.latest_entry:
+                repr += f'on {self.earliest_entry}'
+            else:
+                repr += f'between {self.earliest_entry} and {self.latest_entry}'
 
         return repr
+
+
+
+
 
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
@@ -584,13 +508,11 @@ class BroadcastifyArchive:
 # ArchiveDownloader
 #-----------------------------------------------------------------------------
 class ArchiveDownloader:
-    def __init__(self, parent, login=False, username=None, password=None,
-                 verbose=False):
+    def __init__(self, parent, login=False, username=None, password=None):
         self._parent = parent
 
         self.download_page_soup = None
         self.current_archive_id = None
-        self.verbose = verbose
         self.session = s = _requests.Session()
         self.login = l = login
 
@@ -604,19 +526,21 @@ class ArchiveDownloader:
                 'redirect': '/'
             }
 
-            headers = None #{
-                # 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_14_5) ' +
-                              # 'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/' +
-                              # '75.0.3770.142 Safari/537.36'
-            # }
-
-            _login_credentials_present(username, password)
+            self._login_credentials_present(username, password)
 
             self._parent.throttle.throttle('page')
-            r = s.post(_LOGIN_URL, data=login_data, headers=headers)
+            r = s.post(_LOGIN_URL, data=login_data)
 
             if r.status_code != 200:
-                raise ConnectionError(f'Problem connecting: {r.status_code}')
+                raise ConnectionError(f'Encountered a problem connecting '
+                                      f'during ArchiveDownloader initialization:'
+                                      f' code = {r.status_code}, login = {l}')
+            # Check successful login
+            soup = _BeautifulSoup(r.text, 'lxml')
+
+            if soup(text='Log in Failed!'):
+                raise NavigatorException(f'Login credentials rejected by the '
+                                         f'server.')
 
     def get_download_soup(self, archive_id):
         self.current_archive_id = archive_id
@@ -625,7 +549,7 @@ class ArchiveDownloader:
         self._parent.throttle.throttle()
         r = s.get(_ARCHIVE_DOWNLOAD_STEM + archive_id)
         if r.status_code != 200:
-            raise ConnectionError(f'Problem connecting to ' +
+            raise ConnectionError(f'Problem connecting while getting soup from '
                     f'{_ARCHIVE_DOWNLOAD_STEM + archive_id}: {r.status_code}')
 
         self.download_page_soup = _BeautifulSoup(r.text, 'lxml')
@@ -639,14 +563,14 @@ class ArchiveDownloader:
         latest_download = max([entry['start_time']
                             for entry in archive_entries])
 
-        t = tqdm(archive_entries, desc='Downloading mp3s',
-                 leave=True, ncols=800)
+        t = _tqdm(archive_entries, desc='Downloading mp3s',
+                 leave=True, dynamic_ncols=True)
         t.write(f'Downloading files to {filepath}.')
 
         for file in t:
             feed_id =  self._parent.feed_id
             archive_uri = file['uri']
-            file_date = self.__format_entry_date(file['end_time'])
+            file_date = self._format_entry_date(file['end_time'])
             t.set_description(f'Downloading {earliest_download} to '
                               f'{latest_download}', refresh=True)
 
@@ -655,17 +579,20 @@ class ArchiveDownloader:
 
             # Get the URL of the mp3 file
             mp3_soup = self.get_download_soup(archive_uri)
-            file_url = self.__parse_mp3_path(mp3_soup)
+            file_url = self._parse_mp3_path(mp3_soup)
 
-            self.__fetch_mp3([out_file_name, file_url], t)
+            self._fetch_mp3([out_file_name, file_url], t)
 
-    def __parse_mp3_path(self, download_page_soup):
-        """Parse the mp3 filepath from a BeautifulSoup of the download page"""
-        return download_page_soup.find('a',
-                                       {'href': _re.compile('.mp3')}
-                                       ).attrs['href']
+    def _parse_mp3_path(self, download_page_soup):
+        try:
+            return download_page_soup.find('a',
+                                           {'href': _re.compile('.mp3')}
+                                           ).attrs['href']
+        except AttributeError:
+            if download_page_soup.find('div', {'class': 'alert-warning'}):
+                raise NavigatorException(f'Premium subscription required.')
 
-    def __fetch_mp3(self, entry, main_progress_bar):
+    def _fetch_mp3(self, entry, main_progress_bar):
         path, url = entry
         file_name = url.split('/')[-1]
 
@@ -675,9 +602,9 @@ class ArchiveDownloader:
             r = _requests.get(url, stream=True)
             file_size = int(r.headers['Content-Length'])
 
-            t = tqdm(total=file_size,
+            t = _tqdm(total=file_size,
                      desc=f'Downloading {file_name}',
-                     ncols=750,
+                     dynamic_ncols=True,
                      leave=False)
 
             if r.status_code == 200:
@@ -698,7 +625,7 @@ class ArchiveDownloader:
         else:
             main_progress_bar.write(f'\t{file_name} already exists. Skipping.')
 
-    def __format_entry_date(self, date):
+    def _format_entry_date(self, date):
         # Format the ArchiveEntry end time as YYYYMMDD-HHMM
         year = date.year
         month = date.month
@@ -709,9 +636,22 @@ class ArchiveDownloader:
         return '-'.join([str(year) + str(month).zfill(2) + str(day).zfill(2),
                          str(hour).zfill(2) + str(minute).zfill(2)])
 
+    def _login_credentials_present(self, username, password):
+        if not username or not password:
+            raise NavigatorException(
+                f"Login credentials were not supplied or are incomplete: "
+                f"username={self._parent.username}; "
+                f"password_supplied={self._parent.password}")
+        else:
+            return True
+
     def __repr__(self):
         return(f'_DownloadNavigator(Current Archive: '
                f'{self.current_archive_id})')
+
+
+
+
 
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
@@ -758,14 +698,20 @@ class ArchiveCalendar:
 
     def go_to_date(self, date):
         ### Navigate to & click on a date in the archive calendar; the clicked-
-        ### on date becomes the new active_date, which is returned.
+        ### on date becomes the new active_date, which is returned
 
         # If date is "today" or equal to end_date, take the shortcut
-        if date == 'today' or date == self.end_date:
+        if date == 'today':
+            date = self.end_date
+
+        if date == self.end_date:
             try:
                 self._parent.throttle.throttle('date_nav')
                 self._browser.find_element_by_class_name('today').click()
-                self._wait_for_refresh()
+                # Check that we need to wait for a refresh
+                if (self.active_date.month != self._displayed_month_dt.month
+                  ) or (self.active_date.year != self._displayed_month_dt.year):
+                    self._wait_for_refresh()
                 return self._displayed_month_dt
             except _NSEE:
                 return False
@@ -779,7 +725,7 @@ class ArchiveCalendar:
         new_day = date.day
 
         # Get the number of months to traverse...
-        months_to_traverse = _diff_month(self.active_date, date)
+        months_to_traverse = self._diff_month(self.active_date, date)
 
         if months_to_traverse >= 0:
             step_direction = 1
@@ -804,6 +750,11 @@ class ArchiveCalendar:
                                     ).click()
         self.update()
         self._att.update()
+
+        return self._displayed_month_dt
+
+    def _diff_month(self, d1, d2):
+        return (d2.year - d1.year) * 12 + d2.month - d1.month
 
     def _get_start_date(self):
         ### Return the earliest navigable date in the archive
@@ -947,6 +898,10 @@ class ArchiveCalendar:
         return (f'ArchiveCalendar(from {self.start_date} to {self.end_date}, '
                 f'active date={self.active_date})')
 
+
+
+
+
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
 #
@@ -1035,10 +990,12 @@ class ArchiveTimesTable:
     def _wait_for_refresh(self):
         # If the ATT previously had entires...
         if self.current_first_uri:
+            _first_uri_xpath = "//a[contains(@href,'/archives/download/')]"
+
             # ...wait until the first entry URI is different
             element = _WebDriverWait(self._browser, 5).until_not(
                             _text_to_be_present_in_href((
-                                _By.XPATH, _FIRST_URI_IN_ATT_XPATH),
+                                _By.XPATH, _first_uri_xpath),
                                 self.current_first_uri))
         else:
             # ...otherwise wait until ATT data has been refreshed
@@ -1046,10 +1003,9 @@ class ArchiveTimesTable:
                             _att_to_be_updated((self.last_refresh)))
 
     def _get_entry_datetimes(self, times):
-        """
-        Convert the archive entry start & end times from a list of strings
-        to a tuple of datetimes
-        """
+        # Convert the archive entry start & end times from a list of strings
+        # to a tuple of datetimes
+
         # Set date component to the date currently displayed
         date = self._parent.active_date
 
@@ -1083,13 +1039,14 @@ class ArchiveTimesTable:
 class NavigatorException(Exception):
     pass
 
+
+
 #-----------------------------------------------------------------------------
 # _RequestThrottle
 #-----------------------------------------------------------------------------
 class _RequestThrottle:
-    """
-    Limits the pace with which requests are sent to Broadcastify's servers.
-    """
+    # Limits the pace with which requests are sent to Broadcastify's servers.
+
     def __init__(self):
         self.last_file_req = _timer()
         self.last_page_req = _timer()
@@ -1097,7 +1054,7 @@ class _RequestThrottle:
 
     def throttle(self, type='page', wait=None):
         """
-        Throttle various types of requests. Valid types are:
+        Throttle various types of requests to Broadcastify. Valid types are:
             - 'page': throttle html requests
             - 'file': throttle mp3 downloads
             - 'date_nav': throttle clicks on elements of the ArchiveCalendar
@@ -1197,16 +1154,17 @@ class _calendar_to_be_refreshed(object):
     def __call__(self, driver):
         is_fresh = False
 
-#         try:
-        # Check for displayed_month changes first
-        is_fresh = driver.find_element_by_class_name(
-                    'datepicker-switch').text != self.displayed_month
-
-        # If that hasn't changed...
-        if not is_fresh:
-            # ...see if the active day has
+        try:
+            # Check for displayed_month changes first
             is_fresh = driver.find_element_by_class_name(
-                        'active').text != self.active_day
-#         except:
-#             is_fresh = False
+                        'datepicker-switch').text != self.displayed_month
+
+            # If that hasn't changed...
+            if not is_fresh:
+                # ...see if the active day has
+                is_fresh = driver.find_element_by_class_name(
+                            'active').text != self.active_day
+        except:
+            is_fresh = False
+
         return is_fresh
