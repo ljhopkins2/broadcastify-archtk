@@ -22,10 +22,10 @@ The toolkit uses [Selenium](https://pypi.org/project/selenium/) to interact with
 
 All testing for the toolkit is done with the Chrome WebDriver, so it's strongly recommended.
 
-- Download the [Chrome WebDriver](https://sites.google.com/a/chromium.org/chromedriver/downloads)
-{: .fs-6 .fw-300 }
+> Download the [Chrome WebDriver](https://sites.google.com/a/chromium.org/chromedriver/downloads)
+{: .fs-5 .fw-400 }
 
-- Other WebDrivers are available [on the selenium pyPI page](https://pypi.org/project/selenium/)
+> Other WebDrivers are available [on the selenium pyPI page](https://pypi.org/project/selenium/)
 
 (It may go without saying, but you must have the browser corresponding to the WebDriver you select installed, too.)
 
