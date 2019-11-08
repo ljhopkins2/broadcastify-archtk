@@ -20,7 +20,7 @@ The toolkit uses [Selenium](https://pypi.org/project/selenium/) to interact with
 
 ### Download a WebDriver
 
-All testing for the toolkit is done with the Chrome WebDriver, so it's strongly recommended.
+All testing for the toolkit is done with the Chrome WebDriver, so it's strongly recommended. The version of the WebDriver you download must match the version of the browser installed on your computer. (For example, if you're using Chrome version 78, you must download ChromeDriver 78.)
 
 > Download the [Chrome WebDriver](https://sites.google.com/a/chromium.org/chromedriver/downloads)
 {: .fs-5 .fw-500 }
@@ -29,11 +29,9 @@ All testing for the toolkit is done with the Chrome WebDriver, so it's strongly 
 {: .fs-3 .fw-300 }
 
 
-(It may go without saying, but you must have the browser corresponding to the WebDriver you select installed, too.)
-
 ### Place it in the OS `PATH`
 
-Once you've downloaded the WebDriver, it must be placed in a directory in the operating system `PATH`. If you're unfamiliar with environment variables, guidance is available from a variety of online sources (_i.e._ "Ask the Google"). Alternatively, an absolute path to the WebDriver file can be passed at archive instantiation.
+Once you've downloaded the WebDriver, it should be placed in a directory in the operating system `PATH`. If you're unfamiliar with environment variables, guidance is available from a variety of online sources (_i.e._ "Ask the Google"). Alternatively, an absolute path to the WebDriver file can be passed [at archive instantiation](/user-guide/creating-an-archive.html#instantiating-the-toolkit).
 
 
 ## Getting Through the Paywall

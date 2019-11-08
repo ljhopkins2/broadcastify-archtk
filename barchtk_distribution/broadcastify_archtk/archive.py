@@ -150,7 +150,10 @@ class BroadcastifyArchive:
             servers.
         """
         self.show_browser_ui = show_browser_ui
-        self.webdriver_path = webdriver_path
+        if webdriver_path is None:
+            self.webdriver_path = 'chromedriver'
+        else:
+            self.webdriver_path = webdriver_path
 
         self.feed_url = _FEED_URL_STEM + feed_id
         self.archive_url = _ARCHIVE_FEED_STEM + feed_id
@@ -296,7 +299,7 @@ class BroadcastifyArchive:
             options.add_argument('--headless')
             options.add_argument('--disable-gpu')
 
-        with _webdriver.Chrome(self.webdriver_path,
+        with _webdriver.Chrome(executable_path=self.webdriver_path,
                                chrome_options=options) as browser:
             browser.get(self.archive_url)
             self.arch_cal = ArchiveCalendar(self, browser)
@@ -418,7 +421,7 @@ class BroadcastifyArchive:
             options.add_argument('--disable-gpu')
 
         # Launch Chrome
-        with _webdriver.Chrome(self.webdriver_path,
+        with _webdriver.Chrome(executable_path=self.webdriver_path,
                                chrome_options=options) as browser:
             browser.get(self.archive_url)
             self.archive_calendar = ArchiveCalendar(self, browser,
