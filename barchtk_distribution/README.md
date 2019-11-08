@@ -6,4 +6,10 @@ broadcastify-archtk was initially developed as part of a group project during th
 
 broadcastify-archtk solves that problem.
 
-More at https://github.com/ljhopkins2/broadcastify-archtk/
+## Resources
+
+- View the package at [pyPI.org](https://pypi.org/project/broadcastify-archtk/)
+
+- Check out [the docs](https://ljhopkins2.github.io/broadcastify-archtk/)
+
+- View the repo at https://github.com/ljhopkins2/broadcastify-archtk/

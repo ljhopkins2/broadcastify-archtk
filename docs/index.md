@@ -35,9 +35,9 @@ pip install broadcastify-archtk
 
 <br>
 
-- **Take a test spin.** Give the [`broadcastify-archtk` demo](https://github.com/ljhopkins2/broadcastify-archtk/blob/master/broadcastify-archtk_demo.ipynb) a try in a Jupyter notebook.
+- **Take a test spin.** Give the [`broadcastify-archtk` demo](https://github.com/ljhopkins2/broadcastify-archtk/blob/master/broadcastify_archtk_demo.ipynb) a try in a Jupyter notebook.
 
 <br><br>
 
-Check out [the User Guide](user-guide) for more information.
-{: .fs-6 .fw-300 }
+_Check out [the User Guide](user-guide) for more information._
+{: .fs-6 .fw-400 }
