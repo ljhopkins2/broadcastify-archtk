@@ -84,9 +84,10 @@ _DATE_NAV_WAIT = 0.1
 #-----------------------------------------------------------------------------
 class BroadcastifyArchive:
     def __init__(self, feed_id, username=None, password=None,
-                 login_cfg_path=None, show_browser_ui=False):
+                 login_cfg_path=None, show_browser_ui=False,
+                 webdriver_path=None):
         """
-        A container for Broadcastify feed archive data, and an enginge for re-
+        A container for Broadcastify feed archive data, and an engine for re-
         trieving archive entry information & downloading the corresponding mp3
         files. Populates feed name, feed & archive URLs, and start & end dates
         on initialization.
@@ -114,6 +115,9 @@ class BroadcastifyArchive:
 
             Note that no browser will be shown during download, since
             requests.Session() is used, not Selenium.
+        webdriver_path : str
+                Optional absolute path to WebDriver if it's not located in a
+                directory in the PATH environment variable
 
 
         Other Attributes & Properties
@@ -146,6 +150,7 @@ class BroadcastifyArchive:
             servers.
         """
         self.show_browser_ui = show_browser_ui
+        self.webdriver_path = webdriver_path
 
         self.feed_url = _FEED_URL_STEM + feed_id
         self.archive_url = _ARCHIVE_FEED_STEM + feed_id
@@ -186,7 +191,7 @@ class BroadcastifyArchive:
                 The earliest date for which to populate the archive. If None,
                 go from the earliest date on the calendar (inclusive).
             end : datetime.date
-                The earliest date for which to populate the archive. If None,
+                The latest date for which to populate the archive. If None,
                 go to the latest date on the calendar (inclusive).
             days_back : int
                 The number of days before the current day to retrieve informa-
@@ -291,20 +296,20 @@ class BroadcastifyArchive:
             options.add_argument('--headless')
             options.add_argument('--disable-gpu')
 
-        # with _webdriver.Chrome(chrome_options=options) as browser:
-        browser = _webdriver.Chrome(chrome_options=options)
-        browser.get(self.archive_url)
-        self.arch_cal = ArchiveCalendar(self, browser)
+        with _webdriver.Chrome(self.webdriver_path,
+                               chrome_options=options) as browser:
+            browser.get(self.archive_url)
+            self.arch_cal = ArchiveCalendar(self, browser)
 
-        # Get archive entries for each date in list
-        t = _tqdm(date_list, desc=f'Building dates', leave=True,
-                  dynamic_ncols=True)
-        for date in t:
-            t.set_description(f'Building {date}', refresh=True)
-            self.arch_cal.go_to_date(date)
+            # Get archive entries for each date in list
+            t = _tqdm(date_list, desc=f'Building dates', leave=True,
+                      dynamic_ncols=True)
+            for date in t:
+                t.set_description(f'Building {date}', refresh=True)
+                self.arch_cal.go_to_date(date)
 
-            if self.arch_cal.entries_for_date:
-                archive_entries.extend(self.arch_cal.entries_for_date)
+                if self.arch_cal.entries_for_date:
+                    archive_entries.extend(self.arch_cal.entries_for_date)
 
         # Empty & replace the current archive entries
         self.entries = []
@@ -329,7 +334,7 @@ class BroadcastifyArchive:
     def download(self, start=None, end=None, all_entries=False,
              output_path=None):
         """
-        Retrieve URIs and download mp3 files for the Broadcastify archive.
+        Retrieve URIs and downloads mp3 files for the Broadcastify archive.
 
         Parameters
         ----------
@@ -357,9 +362,7 @@ class BroadcastifyArchive:
           --------
 
         output_path : str (optional)
-            The local path to which archive entry mp3 files will be written. The
-            path must exist before calling the method. Defaults to the value
-            supplied in the initiailzation file.
+            The absolute path to which archive entry mp3 files will be written.
         """
         # Make sure arguments were passed in a valid combination
         if not all_entries:
@@ -415,7 +418,8 @@ class BroadcastifyArchive:
             options.add_argument('--disable-gpu')
 
         # Launch Chrome
-        with _webdriver.Chrome(chrome_options=options) as browser:
+        with _webdriver.Chrome(self.webdriver_path,
+                               chrome_options=options) as browser:
             browser.get(self.archive_url)
             self.archive_calendar = ArchiveCalendar(self, browser,
                                                     get_dates=True)

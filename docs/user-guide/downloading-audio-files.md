@@ -7,7 +7,7 @@ nav_order: 4
 
 # Downloading Audio Files
 
-The `.download()` method retrieves URIs and downloads mp3 files for the Broadcastify archive. `BroadcastifyArchive.entries` attribute.
+The `.download()` method retrieves URIs and downloads mp3 files for the Broadcastify archive.
 
 ```python
 download(start=None, end=None, all_entries=False,
@@ -19,7 +19,7 @@ download(start=None, end=None, all_entries=False,
 | `start` | datetime | See [valid date parameter combinations](#valid-date-parameter-combinations) | The earliest date & time for which to download files. Must be a valid date on the archive's calendar. |
 | `end` | datetime | See [valid date parameter combinations](#valid-date-parameter-combinations) | The latest date & time for which to download files. Must be a valid date on the archive's calendar. |
 | `all_entries` | bool | See [valid date parameter combinations](#valid-date-parameter-combinations) | Download all available archive files |
-| `output_path` | str | Required | The absolute path to which archive entry mp3 files will be written. |
+| `output_path` | str | Required | The absolute path to which archive entry mp3 files will be written |
 
 ##### Valid Date Parameter Combinations
 
