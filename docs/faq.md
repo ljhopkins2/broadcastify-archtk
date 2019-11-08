@@ -10,7 +10,8 @@ nav_order: 4
 
 Please search through [the existing issue list](https://github.com/ljhopkins2/broadcastify-archtk/issues) to look for resolutions (or vote up an existing unresolved issue), and submit a new issue if necessary.
 
-## What does the `WebDriverException` mean?
+
+## What does the WebDriverException mean?
 
 ```python
 WebDriverException: Message: 'chromedriver' executable needs to be in PATH.
