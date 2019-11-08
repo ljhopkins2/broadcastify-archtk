@@ -155,6 +155,8 @@ class BroadcastifyArchive:
         else:
             self.webdriver_path = webdriver_path
 
+        self._feed_id = None
+
         self.feed_url = _FEED_URL_STEM + feed_id
         self.archive_url = _ARCHIVE_FEED_STEM + feed_id
         self.username = username
@@ -458,19 +460,23 @@ class BroadcastifyArchive:
     @feed_id.setter
     def feed_id(self, value):
         # Changing the feed_id re-initializes the object's other properties
-        self._feed_id = value
-        self._get_feed_name(value)
-        self.feed_url = _FEED_URL_STEM + value
-        self.archive_url = _ARCHIVE_FEED_STEM + value
-        self.earliest_entry = None
-        self.latest_entry = None
-        self.start_date = None
-        self.end_date = None
-        self.entries = []
-        self.earliest_entry = None
-        self.latest_entry = None
+        if value != self._feed_id:
+            self._feed_id = value
+            self._get_feed_name(value)
+            self.feed_url = _FEED_URL_STEM + value
+            self.archive_url = _ARCHIVE_FEED_STEM + value
+            self.earliest_entry = None
+            self.latest_entry = None
+            self.start_date = None
+            self.end_date = None
+            self.entries = []
+            self.earliest_entry = None
+            self.latest_entry = None
 
-        self._get_archive_dates()
+            self._get_archive_dates()
+        else:
+            print('New Feed ID same as old Feed ID.')
+            print(self)
 
     @property
     def password(self):
@@ -566,20 +572,22 @@ class ArchiveDownloader:
     def get_archive_mp3s(self, archive_entries, filepath):
         start = _timer()
         earliest_download = min([entry['start_time']
-                                 for entry in archive_entries])
+                                 for entry in archive_entries]
+                                 ).strftime('%m-%d-%y %H:%M')
         latest_download = max([entry['start_time']
-                            for entry in archive_entries])
+                            for entry in archive_entries]
+                            ).strftime('%m-%d-%y %H:%M')
 
-        t = _tqdm(archive_entries, desc='Downloading mp3s',
-                 leave=True, dynamic_ncols=True)
-        t.write(f'Downloading files to {filepath}.')
+        t = _tqdm(archive_entries, desc='Overall progress',
+                  leave=True, dynamic_ncols=True)
+
+        t.write(f'Downloading {earliest_download} to {latest_download}')
+        t.write(f'Storing at {filepath}.')
 
         for file in t:
             feed_id =  self._parent.feed_id
             archive_uri = file['uri']
             file_date = self._format_entry_date(file['end_time'])
-            t.set_description(f'Downloading {earliest_download} to '
-                              f'{latest_download}', refresh=True)
 
             # Build the path for saving the downloaded .mp3
             out_file_name = filepath + '-'.join([feed_id, file_date]) + '.mp3'
@@ -610,9 +618,7 @@ class ArchiveDownloader:
             file_size = int(r.headers['Content-Length'])
 
             t = _tqdm(total=file_size,
-                     desc=f'Downloading {file_name}',
-                     dynamic_ncols=True,
-                     leave=False)
+                      desc=f'Downloading {file_name}', dynamic_ncols=True)
 
             if r.status_code == 200:
                 self._parent.throttle.got_last_file = True
@@ -626,9 +632,6 @@ class ArchiveDownloader:
             else:
                 t.write(f'\tCould not retrieve {url} (code {r.status_code}'
                       f'). Skipping.')
-
-            t.close()
-
         else:
             main_progress_bar.write(f'\t{file_name} already exists. Skipping.')
 

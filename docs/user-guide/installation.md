@@ -31,7 +31,7 @@ All testing for the toolkit is done with the Chrome WebDriver, so it's strongly 
 
 ### Place it in the OS `PATH`
 
-Once you've downloaded the WebDriver, it should be placed in a directory in the operating system `PATH`. If you're unfamiliar with environment variables, guidance is available from a variety of online sources (_i.e._ "Ask the Google"). Alternatively, an absolute path to the WebDriver file can be passed [at archive instantiation](/user-guide/creating-an-archive.html#instantiating-the-toolkit).
+Once you've downloaded the WebDriver, it should be placed in a directory in the operating system `PATH`. If you're unfamiliar with environment variables, guidance is available from a variety of online sources (_i.e._ "Ask the Google"). Alternatively, an absolute path to the WebDriver file can be passed [at archive instantiation](/broadcastify-archtk/user-guide/creating-an-archive.html#instantiating-the-toolkit).
 
 
 ## Getting Through the Paywall

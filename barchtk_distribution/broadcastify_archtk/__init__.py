@@ -2,7 +2,7 @@
 #
 # This work is licensed under a GNU Affero General Public License v3.0. See
 # the GitHub repo for more details:
-# https://github.com/ljhopkins2/pybartok/blob/master/LICENSE
+# https://github.com/ljhopkins2/broadcastify-archtk/blob/master/LICENSE
 #
 #-----------------------------------------------------------------------------
 
