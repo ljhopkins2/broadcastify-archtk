@@ -28,4 +28,3 @@ TimeoutException: Message:
 This error message means that Selenium timed out waiting for a particular page element to load. The toolkit uses these elements to determine when the archive navigation page (either the calendar or the archive times table) has refreshed, since the data are loaded asynchronously. I've tried to catch the most common reasons for this error and raise a more meaningful exception.
 
 If you see this error, it could mean that (1) something interrupted the refresh of the navigation page (e.g. network issues) or (2) I missed an opportunity to catch and raise a more specific exception. If you're able to replicate the issue after reinstantiating your archive and re-running your code, please take a look at [the issues list](https://github.com/ljhopkins2/broadcastify-archtk/issues) and log one if you don't see a duplicate.
--
