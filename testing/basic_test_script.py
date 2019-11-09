@@ -4,7 +4,8 @@ sys.path.insert(1, '/Users/joseph/data_science/personal_projects/broadcastify-ar
 
 import broadcastify_archtk.archive as btk
 import datetime as dt
-TEST_FEED_ID = '14439' # Travis County, Austin, TX
+# TEST_FEED_ID = '14439' # Travis County, Austin, TX
+TEST_FEED_ID = '591' # Boulder County, CO
 
 login_path = '/Users/joseph/data_science/personal_projects/broadcastify-archtk/private/pwd.ini'
 # driver_path = '/Users/joseph/GA-DSI/projects/project_5/police-radio-to-mapping/assets/chromedriver'

@@ -12,7 +12,7 @@ Automate downloading audio archives from Broadcastify, the world's largest sourc
 
 [Get Started Now](#get-started){: .btn .btn-purple .mr-4 }[Visit Broadcastify](http://www.broadcastify.com){: .btn .btn-blue }
 
-_This toolkit is not officially affiliated with Broadcastify or Radio Reference._
+_This toolkit and its authors are not affiliated with Broadcastify or Radio Reference._
 {: .fs-1 .lh-0 }
 
 ----
