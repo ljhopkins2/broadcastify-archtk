@@ -28,7 +28,7 @@ BroadcastifyArchive(feed_id=None,
 |:----------|:----------|:------------|:------------|
 | `feed_id` | str | Required | The unique feed identifier for the Broadcastify feed represented by the object, taken from www.broadcastify.com/listen/feed/[feed_id]|
 | `username` | str | Optional | The username for a valid Broadcastify account. In order to download, the account must be a [premium account](https://m.broadcastify.com/premium/). (The parameter is optional at instantiation, but must be set before downloading audio files) |
-| `password` | str | Optional | The password for the account referenced by `username`. Subject to the same requirement timings as `username` |
+| `password` | str | Optional | The password for the account referenced by `username`, and is subject to the same requirement timing |
 | `login_cfg_path` | str | Optional | Absolute path to [a config file](#password-configuration-files) containing the username and password information. Allows the user to maintain the privacy of their account information by by keeping it outside the code using the toolkit |
 | `show_browser_ui` | bool | Optional | If True, scraping done during initialization and build will be done with the Selenium webdriver option `headless=False`, resulting in a visible browser window being open in the UI during scraping. Otherwise, scraping will be done "invisibly".  Note that no browser will be shown during download, since `requests.Session()` is used rather than Selenium |
 | `webdriver_path` | str | Optional | The absolute path to the Selenium webdriver to be used for scraping. Not required if the WebDriver is in a directory in the operating system's `PATH` environment variable. The path must be to the WebDriver file itself, not the containing directory |
