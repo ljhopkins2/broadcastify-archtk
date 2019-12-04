@@ -9,14 +9,16 @@ nav_order: 2
 
 ## Importing the package
 
-All the needed classes for the toolkit are contained in `broadcastify-archtk.archive`. Use the convention
+All the needed classes for the toolkit are contained in the `broadcastify-archtk` package.
+
+**Example Usage:**
 ```python
-import broadcastify_archtk.archive as btk
+from broadcastify_archtk import BroadcastifyArchive
 ```
 
 ## Instantiating the toolkit
 
-The toolkit's capabilities are exposed via the `broadcastify-archtk.archive.BroadcastifyArchive` class.
+The toolkit's capabilities are exposed via the `broadcastify-archtk.btk.BroadcastifyArchive` class.
 
 ```python
 BroadcastifyArchive(feed_id=None,
@@ -33,9 +35,9 @@ BroadcastifyArchive(feed_id=None,
 | `show_browser_ui` | bool | Optional | If True, scraping done during initialization and build will be done with the Selenium webdriver option `headless=False`, resulting in a visible browser window being open in the UI during scraping. Otherwise, scraping will be done "invisibly".  Note that no browser will be shown during download, since `requests.Session()` is used rather than Selenium |
 | `webdriver_path` | str | Optional | The absolute path to the Selenium webdriver to be used for scraping. Not required if the WebDriver is in a directory in the operating system's `PATH` environment variable. The path must be to the WebDriver file itself, not the containing directory |
 
-**Usage:**
+**Example Usage:**
 ```python
-my_archive = btk.BroadcastifyArchive(feed_id='4288')
+my_archive = BroadcastifyArchive(feed_id='4288')
 ```
 
 ## Password Configuration Files
