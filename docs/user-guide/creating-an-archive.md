@@ -9,7 +9,7 @@ nav_order: 2
 
 ## Importing the package
 
-All the needed classes for the toolkit are contained in `broadcastify-archtk.archive`.
+All the needed classes for the toolkit are contained in the `broadcastify-archtk` package.
 
 **Example Usage:**
 ```python
