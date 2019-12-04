@@ -3,6 +3,7 @@
 private
 # mp3 files and folders
 *mp3*
+.idea/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
