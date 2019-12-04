@@ -18,7 +18,7 @@ from broadcastify_archtk import BroadcastifyArchive
 
 ## Instantiating the toolkit
 
-The toolkit's capabilities are exposed via the `broadcastify-archtk.archive.BroadcastifyArchive` class.
+The toolkit's capabilities are exposed via the `broadcastify-archtk.btk.BroadcastifyArchive` class.
 
 ```python
 BroadcastifyArchive(feed_id=None,
