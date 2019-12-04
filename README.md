@@ -2,8 +2,8 @@
 
 #### _The Broadcastify Archive Tool Kit (broadcastify-archtk) for python automates downloading audio archives from [Broadcastify](www.broadcastify.com), "the world's largest source of Public Safety, Airline, Rail, and Marine live audio streams"._
 
-**Version 1.0**<br>
-_Updated 8 Nov 2019_
+**Version 1.0.2**<br>
+_Updated 4 Dec 2019_
 
 ## Resources
 

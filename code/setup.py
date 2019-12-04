@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="broadcastify-archtk", # Replace with your own username
-    version="1.0.0",
+    version="1.0.2",
     author="Joseph Hopkins",
     author_email="49728392+ljhopkins2@users.noreply.github.com",
     description="The Broadcastify Archive Tool Kit",

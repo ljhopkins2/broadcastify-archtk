@@ -10,7 +10,7 @@
 #-----------------------------------------------------------------------------
 #
 # The Broadcastify Archive Toolkit for python
-# v1.0-beta
+# v1.0.2
 #
 #-----------------------------------------------------------------------------
 #-----------------------------------------------------------------------------
@@ -21,6 +21,6 @@
 
 from .btk import BroadcastifyArchive
 
-__version__ = '1.0.0'
+__version__ = '1.0.2'
 __license__ = 'GNU Affero General Public License v3.0'
 __author__ = 'Joseph Hopkins'
