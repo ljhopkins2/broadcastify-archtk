@@ -369,6 +369,11 @@ class BroadcastifyArchive:
         output_path : str (optional)
             The absolute path to which archive entry mp3 files will be written.
         """
+        # Make sure entries exist
+        if not len(self.entries):
+            raise ValueError(f'The archive contains no entries. You may need '
+                             f'to call .build before trying to download.')
+
         # Make sure arguments were passed in a valid combination
         if not all_entries:
             if all([not(start), not(end)]):
@@ -405,12 +410,20 @@ class BroadcastifyArchive:
                                 entry['start_time'] >= filter_start and
                                 entry['end_time'] <= filter_end]
 
-        # Retrieve the file URIs
-        dn = ArchiveDownloader(self, login=True, username=self.username,
-                               password=self.__password)
+        # Check that filtered entries isn't empty
+        if len(filtered_entries):
+            # Retrieve the file URIs
+            dn = ArchiveDownloader(self, login=True, username=self.username,
+                                   password=self.__password)
 
-        # Pass them to _DownloadNavigator to get the files
-        dn.get_archive_mp3s(filtered_entries, output_path)
+            # Pass them to _DownloadNavigator to get the files
+            dn.get_archive_mp3s(filtered_entries, output_path)
+        else:
+            print(f'No entries found between {start} and {end}. \n\nYou '
+                  f'may need to call .build with rebuild=True to include those '
+                  f'dates \nin the BroadcastifyArchive. Or it may be that no '
+                  f'archives exist for \nthose dates on Broadcastify.')
+
 
     def _get_archive_dates(self):
         # Initialize calendar navigation
