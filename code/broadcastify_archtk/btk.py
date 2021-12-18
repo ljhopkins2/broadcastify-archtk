@@ -50,7 +50,9 @@ _MONTHS = ['','January', 'February', 'March',
 
 _FEED_URL_STEM = 'https://www.broadcastify.com/listen/feed/'
 _ARCHIVE_FEED_STEM = 'https://www.broadcastify.com/archives/feed/'
-_ARCHIVE_DOWNLOAD_STEM = 'https://m.broadcastify.com/archives/id/'
+#_ARCHIVE_DOWNLOAD_STEM = 'https://m.broadcastify.com/archives/id/'
+_ARCHIVE_DOWNLOAD_STEM = 'https://m.broadcastify.com/archives/idv2/'
+#_ARCHIVE_DOWNLOAD_STEM = 'https://m.broadcastify.com/archives/downloadv2/'
 _LOGIN_URL = 'https://www.broadcastify.com/login/'
 
 # Throttle times
@@ -296,6 +298,7 @@ class BroadcastifyArchive:
         # Spin up a browser and an ArchiveCalendar
         # Set whether to show browser UI while fetching
         print('Launching webdriver...')
+        
         options = _Options()
         if not self.show_browser_ui:
             options.add_argument('--headless')
@@ -303,7 +306,27 @@ class BroadcastifyArchive:
 
         with _webdriver.Chrome(executable_path=self.webdriver_path,
                                chrome_options=options) as browser:
+            import time
+                               
+            browser.get(_LOGIN_URL)
+            username = browser.find_element_by_id("signinSrEmail")
+            username.clear()
+            username.send_keys(self.username)
+            
+            time.sleep(3)
+            
+            password = browser.find_element_by_id("signinSrPassword")
+            password.clear()
+            password.send_keys(self.__password)
+            
+            time.sleep(3)
+            
+            browser.find_element_by_class_name("btn.btn-primary.transition-3d-hover").click()
+            
+            time.sleep(3)
+            
             browser.get(self.archive_url)
+                       
             self.arch_cal = ArchiveCalendar(self, browser)
 
             # Get archive entries for each date in list
@@ -369,6 +392,7 @@ class BroadcastifyArchive:
         output_path : str (optional)
             The absolute path to which archive entry mp3 files will be written.
         """
+        
         # Make sure entries exist
         if not len(self.entries):
             raise ValueError(f'The archive contains no entries. You may need '
@@ -597,10 +621,12 @@ class ArchiveDownloader:
         t.write(f'Downloading {earliest_download} to {latest_download}')
         t.write(f'Storing at {filepath}.')
 
-        for file in t:
+
+        for file_info in t:
             feed_id =  self._parent.feed_id
-            archive_uri = file['uri']
-            file_date = self._format_entry_date(file['end_time'])
+            archive_uri = file_info['uri']
+            file_date = self._format_entry_date(file_info['end_time'])
+
 
             # Build the path for saving the downloaded .mp3
             out_file_name = filepath + '-'.join([feed_id, file_date]) + '.mp3'
@@ -954,7 +980,7 @@ class ArchiveTimesTable:
                 window.lastRefresh = new Date()
             }).observe(
             document.querySelector(
-            "table.table.table-striped.table-bordered.hover.dataTable.no-footer"
+            "table.table-sm.table-striped.table-bordered.table-hover.compact.dataTable.no-footer"
             ), {attributes: true, childList: true, subtree: true } )
         """
         )
@@ -990,7 +1016,7 @@ class ArchiveTimesTable:
 
             # Grab the file ID
             file_uri = row.find('a')['href'].split('/')[-1]
-
+            
             # Put the file date/time and URL leaf (as a list) into the list
             att_entries.append([file_uri, file_start, file_end])
 
@@ -1013,7 +1039,8 @@ class ArchiveTimesTable:
     def _wait_for_refresh(self):
         # If the ATT previously had entires...
         if self.current_first_uri:
-            _first_uri_xpath = "//a[contains(@href,'/archives/download/')]"
+#            _first_uri_xpath = "//a[contains(@href,'/archives/download/')]"
+            _first_uri_xpath = "//a[contains(@href,'/archives/downloadv2/')]"            
 
             # ...wait until the first entry URI is different
             element = _WebDriverWait(self._browser, 5).until_not(
